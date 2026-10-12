@@ -14,5 +14,26 @@ services:
       interval: 2s
       retries: 30
 
+  # Applies migrations and exits. Only this step holds the admin role.
+  migrate:
+    build: .
+    command: ["node", "src/migrate.ts"]
+    environment:
+      DATABASE_URL: postgres://hivemind_app:hivemind_app@db:5432/hivemind
+      DATABASE_ADMIN_URL: postgres://hivemind:hivemind@db:5432/hivemind
+    depends_on:
+      db:
+        condition: service_healthy
+
+  hivemind:
+    build: .
+    environment:
+      DATABASE_URL: postgres://hivemind_app:hivemind_app@db:5432/hivemind
+    ports:
+      - "127.0.0.1:${HIVEMIND_PORT:-4100}:4100"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
 volumes:
   db:

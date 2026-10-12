@@ -1,4 +1,4 @@
-import type { Session, Sql } from './db.ts';
+import { personOf, type Session, type Sql } from './db.ts';
 
 export type Role = 'admin' | 'member';
 
@@ -14,6 +14,8 @@ export interface Space {
   closed: boolean;
   /** Set when the space is in someone's personal tree. */
   privateTo: string | null;
+  /** Whether the person can manage the space. */
+  admin: boolean;
 }
 
 /** Creates a person with their personal space. */
@@ -46,12 +48,22 @@ export async function removeMember(s: Session, spaceId: string, personId: string
 }
 
 export async function listSpaces(s: Session): Promise<Space[]> {
+  const person = personOf(s.principal) ?? null;
   return s.tx<Space[]>`
-    select id, name, parent_id, closed, private_to
-    from spaces
-    where id in (${accessibleSpaces(s)})
-    order by created_at
+    select s.id, s.name, s.parent_id, s.closed, s.private_to, coalesce(a.admin, false) as admin
+    from spaces s
+    left join space_access a on a.space_id = s.id and a.person_id = ${person}::uuid
+    where s.id in (${accessibleSpaces(s)})
+    order by s.created_at
   `;
+}
+
+/** The names of the people with these ids, as far as the session can see them. */
+export async function peopleNames(s: Session, ids: (string | null)[]): Promise<Map<string, string>> {
+  const known = [...new Set(ids.filter((id) => id !== null))];
+  if (known.length === 0) return new Map();
+  const people = await s.tx<{ id: string; name: string }[]>`select id, name from people where id in ${s.tx(known)}`;
+  return new Map(people.map((person) => [person.id, person.name]));
 }
 
 /**

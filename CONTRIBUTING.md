@@ -7,11 +7,25 @@ Hivemind is still being designed, so the most useful contribution right now is a
 You need Node.js 24 or later and Docker.
 
 ```sh
-docker compose up -d   # PostgreSQL on port 5442
+docker compose up -d db   # PostgreSQL on port 5442
 npm install
-npm run check          # type checking
-npm test               # recreates the test database and runs the tests
+npm run check             # type checking
+npm test                  # recreates the test database and runs the tests
 ```
+
+### Trying it with Claude Code
+
+Until Hivemind has sign-in, a small command-line tool sets up people, spaces and tokens. Each command prints what it creates.
+
+```sh
+docker compose up -d --build
+docker compose exec hivemind node src/cli.ts add-person "Your name"
+docker compose exec hivemind node src/cli.ts add-space <your id> "A client"
+docker compose exec hivemind node src/cli.ts add-token <your id> "Claude Code"
+claude mcp add --transport http hivemind http://localhost:4100/mcp --header "Authorization: Bearer <token>"
+```
+
+Then ask Claude Code to remember something for that client, and ask about it in a new session.
 
 ## Releasing
 
