@@ -2,7 +2,7 @@
 
 AI assistants are good at helping with a single task. They are bad at knowing your work: which project you're in, how things are done there, what was decided last week. That understanding ends up scattered across folders, chats and tools, and every assistant starts from scratch.
 
-Hivemind is an open-source home for that working context. It works with whichever assistant you use.
+Hivemind is an open-source home for that working context, designed to work with whichever assistant you use.
 
 ## Why
 
@@ -26,13 +26,13 @@ Every space has a shared side for its members and a private side for each of the
 
 > Hivemind learns automatically, shares deliberately, and changes behavior consciously.
 
-Agents connect over MCP, so Hivemind works from Claude, ChatGPT, Copilot or Claude Code. It runs on your own server, and it is useful without an AI model of its own. Connecting one lets it learn in the background.
+Agents connect over MCP, so Hivemind is designed to work from Claude, ChatGPT, Copilot or Claude Code. It runs on your own server, and it is useful without an AI model of its own. Connecting one lets it learn in the background.
 
 ## An example
 
-You're a consultant with three clients. On Monday you ask your assistant to plan the week. It sees the deadlines in all three clients' task systems and in your calendar, and drafts a plan only you can see.
+You're a consultant working with three clients. On Monday you ask your assistant to plan the week. It combines the deadlines in each client's task system with your calendar, personal commitments included, and drafts a plan only you can see.
 
-Later, one client emails to move a launch date. Hivemind updates that project's knowledge on your private side, notes where the new date came from, and asks whether your colleague on the project should know too. Your other clients never see any of it.
+Later, a client moves a launch date. Hivemind learns about it on your private side and asks whether the project should know. You say yes, and your colleague's assistant now works from the new date too. Your personal plans and your other clients stay private.
 
 ## Status
 
