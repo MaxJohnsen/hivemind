@@ -62,7 +62,7 @@ export async function editRule(s: Session, ruleId: string, body: string): Promis
 export async function removeRule(s: Session, ruleId: string): Promise<boolean> {
   const rule = await ownRule(s, ruleId);
   if (!rule) return false;
-  await insertItem(s, { ...rule, kind: 'removed', body: '', supersedes: rule.id });
+  await insertItem(s, { ...rule, kind: 'removed', body: '', supersedes: rule.id, path: null });
   return true;
 }
 
@@ -74,19 +74,8 @@ export async function removeRule(s: Session, ruleId: string): Promise<boolean> {
  * does, by this order.
  */
 export async function rulesFor(s: Session, spaceId: string): Promise<Rule[]> {
-  const me = personOf(s.principal) ?? null;
   return s.tx<Rule[]>`
-    with chain (space_id, distance) as (
-      select ${spaceId}::uuid, 0
-      union all
-      select id, distance from spaces_above(${spaceId}::uuid)
-    ),
-    applies (space_id, distance) as (
-      select space_id, distance from chain
-      union all
-      select id, (select count(*)::integer from chain) from spaces
-      where private_to = ${me}::uuid and parent_id is null and id not in (select space_id from chain)
-    )
+    ${applying(s, spaceId)}
     select c.id, c.space_id, sp.name as space_name,
            coalesce(sp.private_to is not null and sp.parent_id is null, false) as personal,
            c.kind, c.body, c.private_to, not c.reaches_down as only_here
@@ -98,6 +87,28 @@ export async function rulesFor(s: Session, spaceId: string): Promise<Rule[]> {
       and (a.distance = 0 or c.reaches_down)
       and ${visibleContent(s, 'c')} and ${current(s, 'c')}
     order by a.distance desc, c.private_to is not null, c.created_at
+  `;
+}
+
+/**
+ * The spaces whose guidance applies in a space, as a query named applies:
+ * the space itself at distance 0, each space above it, and the viewer's
+ * personal space, which is always the farthest.
+ */
+export function applying(s: Session, spaceId: string) {
+  return s.tx`
+    with chain (space_id, distance) as (
+      select ${spaceId}::uuid, 0
+      union all
+      select id, distance from spaces_above(${spaceId}::uuid)
+    ),
+    applies (space_id, distance) as (
+      select space_id, distance from chain
+      union all
+      select id, (select count(*)::integer from chain) from spaces
+      where private_to = ${personOf(s.principal) ?? null}::uuid and parent_id is null
+        and id not in (select space_id from chain)
+    )
   `;
 }
 

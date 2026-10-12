@@ -6,8 +6,10 @@ export interface Item {
   id: string;
   pageId: string;
   spaceId: string;
-  /** A page's title, knowledge, a rule on a guidance page, or the removal of a rule. */
-  kind: 'title' | 'text' | 'requirement' | 'preference' | 'removed';
+  /** A page's title, knowledge, a rule on a guidance page, a skill's file, or the removal of a rule or file. */
+  kind: 'title' | 'text' | 'requirement' | 'preference' | 'file' | 'removed';
+  /** Where a skill's file goes in its folder, such as references/tone.md. */
+  path: string | null;
   /** The person whose private side the item is on, or null when shared. */
   privateTo: string | null;
   body: string;
@@ -253,11 +255,14 @@ export async function search(
       ? s.tx`and ${s.tx(table)}.space_id in (select space_subtree(${options.spaceId}::uuid))`
       : s.tx``;
 
+  // A match in a skill's current files finds the skill, once.
   return s.tx<Hit[]>`
     select kind, id, space_id, page_id, page_type, title, text, private, superseded, updates_shared from (
-      select case c.kind when 'title' then 'page' else 'item' end as kind,
-             case c.kind when 'title' then c.page_id else c.id end as id,
-             c.space_id, c.page_id, p.type as page_type, ${titleOf(s, s.tx`c.page_id`)} as title, c.body as text,
+    select distinct on (kind, id) * from (
+      select case when c.kind in ('title', 'file') then 'page' else 'item' end as kind,
+             case when c.kind in ('title', 'file') then c.page_id else c.id end as id,
+             c.space_id, c.page_id, p.type as page_type, ${titleOf(s, s.tx`c.page_id`)} as title,
+             case c.kind when 'file' then ${titleOf(s, s.tx`c.page_id`)} else c.body end as text,
              c.private_to is not null as private, not ${current(s, 'c')} as superseded,
              c.private_to is not null and exists (
                select from content r where r.id = c.supersedes and r.private_to is null and ${visible(s, 'r')}
@@ -267,6 +272,7 @@ export async function search(
       join pages p on p.id = c.page_id
       where c.search @@ to_tsquery('simple', ${terms}) and ${visibleContent(s, 'c')} ${within('c')}
         and ${options.knowledge ? knowledge(s, 'p') : s.tx`true`}
+        and (c.kind <> 'file' or ${current(s, 'c')})
       union all
       select 'source', src.id, src.space_id, null, null, src.reference, src.excerpt, src.private_to is not null, false, false,
              ts_rank(src.search, to_tsquery('simple', ${terms}), 1)
@@ -274,13 +280,15 @@ export async function search(
       where src.search @@ to_tsquery('simple', ${terms}) and ${visible(s, 'src')} ${within('src')}
     ) hits
     where not (${options.current ?? false} and superseded)
+    order by kind, id, superseded, rank desc
+    ) best
     order by superseded, rank desc
     limit ${options.limit ?? 20}
   `;
 }
 
 export function itemColumns(s: Session) {
-  return s.tx`id, page_id, space_id, kind, private_to, body, written_by, agent, supersedes, reaches_down, created_at, updated_at`;
+  return s.tx`id, page_id, space_id, kind, path, private_to, body, written_by, agent, supersedes, reaches_down, created_at, updated_at`;
 }
 
 function sourceColumns(s: Session) {
@@ -293,12 +301,13 @@ export async function insertItem(
     supersedes?: string;
     sources?: string[];
     reachesDown?: boolean;
+    path?: string | null;
   },
 ): Promise<Item> {
   const [inserted] = await s.tx<Item[]>`
-    insert into content (page_id, space_id, private_to, kind, body, supersedes, reaches_down)
-    values (${item.pageId}::uuid, ${item.spaceId}::uuid, ${item.privateTo}::uuid, ${item.kind}, ${item.body},
-            ${item.supersedes ?? null}::uuid, ${item.reachesDown ?? false})
+    insert into content (page_id, space_id, private_to, kind, path, body, supersedes, reaches_down)
+    values (${item.pageId}::uuid, ${item.spaceId}::uuid, ${item.privateTo}::uuid, ${item.kind}, ${item.path ?? null},
+            ${item.body}, ${item.supersedes ?? null}::uuid, ${item.reachesDown ?? false})
     returning ${itemColumns(s)}
   `;
   await cite(s, inserted.id, item.sources);
@@ -395,9 +404,9 @@ export function current(s: Session, table: string) {
   )`;
 }
 
-/** Knowledge pages, not guidance. */
+/** Knowledge pages, not guidance or skills. */
 function knowledge(s: Session, table: string) {
-  return s.tx`${s.tx(table)}.type is distinct from 'guidance'`;
+  return s.tx`coalesce(${s.tx(table)}.type, '') not in ('guidance', 'skill')`;
 }
 
 /** The page's title as the viewer sees it: their own if they named it, otherwise the shared one. */
