@@ -56,4 +56,4 @@ Tests show that Hivemind keeps its promises. A good test reads like a short stor
 - Record decisions in the spec, keep the concept, spec and architecture consistent, and remove anything a new decision makes stale.
 - Change the documents only when behavior or a design decision changes, in the same pull request as the code.
 - `notes/` holds unpublished research. It is ignored by git, and its content never goes into `docs/` without being checked and rewritten.
-- Commits follow Conventional Commits: `type(scope): subject`.
+- Everything reaches `main` through a pull request that passes CI. Pull requests are squash-merged, so the title becomes the commit and its description the commit message. Titles follow Conventional Commits: `type(scope): subject`.
