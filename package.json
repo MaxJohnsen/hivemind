@@ -7,14 +7,20 @@
     "node": ">=24"
   },
   "scripts": {
+    "start": "node src/server.ts",
     "migrate": "node src/migrate.ts",
+    "hivemind": "node src/cli.ts",
     "check": "tsc",
     "test": "node test/reset.ts && node --test 'test/**/*.test.ts'"
   },
   "dependencies": {
-    "postgres": "^3.4.9"
+    "@modelcontextprotocol/node": "^2.1.1",
+    "@modelcontextprotocol/server": "^2.3.1",
+    "postgres": "^3.4.9",
+    "zod": "^4.6.6"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.3.1",
     "@types/node": "^24.19.2",
     "typescript": "^7.0.2"
   }

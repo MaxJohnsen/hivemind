@@ -25,6 +25,7 @@ Chosen for fast context retrieval, simple self-hosting, reliable concurrency and
 | Language | TypeScript on Node.js, for the MCP server, web app, workers and adapters |
 | Database | PostgreSQL, the single source of truth |
 | Database access | Plain SQL through postgres.js, with SQL migration files |
+| MCP | The official TypeScript SDK over Streamable HTTP, at `/mcp` |
 | Search | Postgres full-text search plus `pg_trgm` for names; pgvector only when semantic search is enabled |
 | Queue | Postgres (`SKIP LOCKED`) |
 | Space tree | Plain tables with recursive queries |
@@ -63,6 +64,8 @@ Each routine run is a job, recording who it acted for, which connection it used,
 ## Self-hosting
 
 Self-hosting is part of the product, not something users piece together: HTTPS, MCP authentication, OAuth callbacks, migrations, upgrades, backup and restore. A full backup includes the encryption key. A Markdown export is not an operational backup.
+
+Hivemind applies its migrations when it starts. Local agents such as Claude Code connect with a personal token, of which Hivemind keeps only a hash. Claude.ai and ChatGPT need OAuth, which comes later.
 
 ## Toward a hosted version
 
