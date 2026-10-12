@@ -1,0 +1,9 @@
+# How GitHub groups merged pull requests in generated release notes.
+changelog:
+  categories:
+    - title: Changes
+      labels: ["*"]
+      exclude:
+        labels: [dependencies]
+    - title: Dependencies
+      labels: [dependencies]
