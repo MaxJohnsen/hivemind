@@ -33,6 +33,7 @@ You can see a space's shared side if you have access to the space, and you alway
 **The access rule.** Everything in a space records its space and, when it is private, whose it is (`private_to`). You can see an item if you can access its space and it is either shared or yours.
 
 - Access comes from memberships, parents and closed spaces. Hivemind keeps it in a derived access table, updated in the same transaction as the change, so removing someone takes effect immediately. Every query, search and job checks it.
+- Only a space's admins create spaces under it, because a child space receives the parent's shared guidance.
 - Guidance is the one exception. A shared rule is also visible in every space below its own that it reaches, rule by rule, never the whole guidance page. Private and *only here* rules stay where they are, private guidance reaches down only for its owner, and knowledge never reaches down. Because the exception is part of the rule, `context`, `search` and `read` always agree.
 
 **Knowledge is shared with a space, not with individual members.** Published knowledge is seen by current and future members.

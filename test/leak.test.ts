@@ -146,6 +146,13 @@ describe('straight against the database', () => {
     }
   });
 
+  test('nobody can put their own table in place of Hivemind’s', async () => {
+    await assert.rejects(
+      as(acme.person, (s) => s.tx`create temp table space_access (person_id uuid, space_id uuid, admin boolean)`),
+      refused,
+    );
+  });
+
   test('Hivemind’s role is restricted, and every table it can read is protected', async () => {
     const [role] = await db`select rolsuper, rolbypassrls from pg_roles where rolname = current_user`;
     assert.deepEqual(role, { rolsuper: false, rolbypassrls: false });

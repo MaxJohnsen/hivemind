@@ -73,7 +73,7 @@ test('your personal tree is yours alone', async () => {
   );
 });
 
-test('only admins change membership, but anyone can leave', async () => {
+test('only admins create spaces under a space or change membership, but anyone can leave', async () => {
   const ana = await person('Ana');
   const ben = await person('Ben');
   const cara = await person('Cara');
@@ -83,6 +83,8 @@ test('only admins change membership, but anyone can leave', async () => {
     return acme;
   });
 
+  // A space under Acme receives Acme's shared guidance, so only Acme's admins create one.
+  await assert.rejects(as(ben, (s) => createSpace(s, { name: 'Side room', parentId: acme, closed: true })), refused);
   await assert.rejects(as(ben, (s) => addMember(s, acme, cara.id)), refused);
   await assert.rejects(as(ben, (s) => removeMember(s, acme, ana.id)), refused);
 
