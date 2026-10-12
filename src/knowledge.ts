@@ -6,7 +6,8 @@ export interface Item {
   id: string;
   pageId: string;
   spaceId: string;
-  kind: 'title' | 'text';
+  /** A page's title, knowledge, a rule on a guidance page, or the removal of a rule. */
+  kind: 'title' | 'text' | 'requirement' | 'preference' | 'removed';
   /** The person whose private side the item is on, or null when shared. */
   privateTo: string | null;
   body: string;
@@ -16,6 +17,8 @@ export interface Item {
   agent: string | null;
   /** The item this one replaced, if any. */
   supersedes: string | null;
+  /** Guidance that also applies in the spaces below its own. Knowledge never does. */
+  reachesDown: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -59,6 +62,8 @@ export interface Hit {
   id: string;
   spaceId: string;
   pageId: string | null;
+  /** The type of the page, such as guidance or project. */
+  pageType: string | null;
   title: string | null;
   text: string;
   private: boolean;
@@ -151,6 +156,7 @@ export async function updateItem(
     where id = ${itemId}::uuid and ${visible(s, 'content')}
     returning ${itemColumns(s)}
   `;
+  if (!item) return undefined;
   await cite(s, item.id, input.sources);
   return item;
 }
@@ -181,7 +187,7 @@ export async function readPage(s: Session, pageId: string): Promise<Page | undef
       where r.id = content.supersedes
     ) as replaced
     from content
-    where page_id = ${pageId}::uuid and ${visible(s, 'content')} and ${current(s, 'content')}
+    where page_id = ${pageId}::uuid and kind <> 'removed' and ${visibleContent(s, 'content')} and ${current(s, 'content')}
     order by created_at
   `;
   if (items.length === 0) return undefined;
@@ -193,7 +199,7 @@ export async function readPage(s: Session, pageId: string): Promise<Page | undef
     spaceId: items[0].spaceId,
     type,
     title: titles[0]?.body ?? 'Untitled',
-    items: items.filter((item) => item.kind === 'text'),
+    items: items.filter((item) => item.kind !== 'title'),
   };
 }
 
@@ -202,25 +208,25 @@ export async function readItem(s: Session, itemId: string) {
   const [item] = await s.tx<(Item & { sources: Citation[] })[]>`
     select ${itemColumns(s)}, ${citationsOf(s)} as sources
     from content
-    where id = ${itemId}::uuid and ${visible(s, 'content')}
+    where id = ${itemId}::uuid and ${visibleContent(s, 'content')}
   `;
   if (!item) return undefined;
   const history = await s.tx<Revision[]>`
     select body, written_by, agent, written_at, replaced_at
     from revisions
-    where content_id = ${itemId}::uuid
+    where content_id = ${itemId}::uuid and ${visible(s, 'revisions')}
     order by replaced_at
   `;
   return { ...item, history, replacedBy: await replacementOf(s, itemId) };
 }
 
-/** The pages in a space that the viewer can see, most recently changed first. */
+/** The knowledge pages in a space that the viewer can see, most recently changed first. */
 export async function listPages(s: Session, spaceId: string) {
   return s.tx<{ id: string; type: string | null; title: string | null; updatedAt: Date }[]>`
     select c.page_id as id, p.type, ${titleOf(s, s.tx`c.page_id`)} as title, max(c.updated_at) as updated_at
     from content c
     join pages p on p.id = c.page_id
-    where c.space_id = ${spaceId}::uuid and ${visible(s, 'c')} and ${current(s, 'c')}
+    where c.space_id = ${spaceId}::uuid and ${knowledge(s, 'p')} and ${visible(s, 'c')} and ${current(s, 'c')}
     group by c.page_id, p.type
     order by updated_at desc
   `;
@@ -228,15 +234,16 @@ export async function listPages(s: Session, spaceId: string) {
 
 /**
  * Searches items and sources the viewer can see, optionally within a space
- * and the spaces below it. Longer words match by how they start, so
- * "launch" finds "launches"; short ones match only whole words. Shorter
- * texts rank higher, and items that are no longer true come last, or not at
- * all when only current knowledge is wanted.
+ * and the spaces below it, and optionally only knowledge, without guidance.
+ * Longer words match by how they start, so "launch" finds "launches"; short
+ * ones match only whole words. Shorter texts rank higher, and items that are
+ * no longer true come last, or not at all when only current knowledge is
+ * wanted.
  */
 export async function search(
   s: Session,
   query: string,
-  options: { spaceId?: string; limit?: number; current?: boolean } = {},
+  options: { spaceId?: string; limit?: number; current?: boolean; knowledge?: boolean } = {},
 ): Promise<Hit[]> {
   const words = query.match(/[\p{L}\p{N}]+/gu);
   if (!words) return [];
@@ -247,19 +254,21 @@ export async function search(
       : s.tx``;
 
   return s.tx<Hit[]>`
-    select kind, id, space_id, page_id, title, text, private, superseded, updates_shared from (
+    select kind, id, space_id, page_id, page_type, title, text, private, superseded, updates_shared from (
       select case c.kind when 'title' then 'page' else 'item' end as kind,
              case c.kind when 'title' then c.page_id else c.id end as id,
-             c.space_id, c.page_id, ${titleOf(s, s.tx`c.page_id`)} as title, c.body as text,
+             c.space_id, c.page_id, p.type as page_type, ${titleOf(s, s.tx`c.page_id`)} as title, c.body as text,
              c.private_to is not null as private, not ${current(s, 'c')} as superseded,
              c.private_to is not null and exists (
                select from content r where r.id = c.supersedes and r.private_to is null and ${visible(s, 'r')}
              ) as updates_shared,
              ts_rank(c.search, to_tsquery('simple', ${terms}), 1) as rank
       from content c
-      where c.search @@ to_tsquery('simple', ${terms}) and ${visible(s, 'c')} ${within('c')}
+      join pages p on p.id = c.page_id
+      where c.search @@ to_tsquery('simple', ${terms}) and ${visibleContent(s, 'c')} ${within('c')}
+        and ${options.knowledge ? knowledge(s, 'p') : s.tx`true`}
       union all
-      select 'source', src.id, src.space_id, null, src.reference, src.excerpt, src.private_to is not null, false, false,
+      select 'source', src.id, src.space_id, null, null, src.reference, src.excerpt, src.private_to is not null, false, false,
              ts_rank(src.search, to_tsquery('simple', ${terms}), 1)
       from sources src
       where src.search @@ to_tsquery('simple', ${terms}) and ${visible(s, 'src')} ${within('src')}
@@ -270,22 +279,26 @@ export async function search(
   `;
 }
 
-function itemColumns(s: Session) {
-  return s.tx`id, page_id, space_id, kind, private_to, body, written_by, agent, supersedes, created_at, updated_at`;
+export function itemColumns(s: Session) {
+  return s.tx`id, page_id, space_id, kind, private_to, body, written_by, agent, supersedes, reaches_down, created_at, updated_at`;
 }
 
 function sourceColumns(s: Session) {
   return s.tx`id, space_id, private_to, reference, excerpt`;
 }
 
-async function insertItem(
+export async function insertItem(
   s: Session,
-  item: Pick<Item, 'pageId' | 'spaceId' | 'privateTo' | 'kind' | 'body'> & { supersedes?: string; sources?: string[] },
+  item: Pick<Item, 'pageId' | 'spaceId' | 'privateTo' | 'kind' | 'body'> & {
+    supersedes?: string;
+    sources?: string[];
+    reachesDown?: boolean;
+  },
 ): Promise<Item> {
   const [inserted] = await s.tx<Item[]>`
-    insert into content (page_id, space_id, private_to, kind, body, supersedes)
+    insert into content (page_id, space_id, private_to, kind, body, supersedes, reaches_down)
     values (${item.pageId}::uuid, ${item.spaceId}::uuid, ${item.privateTo}::uuid, ${item.kind}, ${item.body},
-            ${item.supersedes ?? null}::uuid)
+            ${item.supersedes ?? null}::uuid, ${item.reachesDown ?? false})
     returning ${itemColumns(s)}
   `;
   await cite(s, inserted.id, item.sources);
@@ -314,7 +327,7 @@ async function changeableItem(s: Session, itemId: string): Promise<Item | undefi
 async function replacementOf(s: Session, itemId: string): Promise<{ id: string; at: Date } | undefined> {
   const [replacement] = await s.tx<{ id: string; at: Date }[]>`
     select id, created_at as at from content
-    where supersedes = ${itemId}::uuid and ${visible(s, 'content')}
+    where supersedes = ${itemId}::uuid and ${visibleContent(s, 'content')}
     order by created_at
     limit 1
   `;
@@ -332,14 +345,14 @@ async function cite(s: Session, itemId: string, sourceIds: string[] = []) {
 }
 
 /** Which side a write goes to: shared, or the person's own private side. */
-function sideOf(s: Session, shared = false): string | null {
+export function sideOf(s: Session, shared = false): string | null {
   if (shared) return null;
   const person = personOf(s.principal);
   if (!person) throw new AccessDenied('A space has no private side.');
   return person;
 }
 
-async function checkSpace(s: Session, spaceId: string, shared = false) {
+export async function checkSpace(s: Session, spaceId: string, shared = false) {
   const [space] = await s.tx<{ personal: boolean }[]>`
     select private_to is not null as personal
     from spaces
@@ -353,7 +366,7 @@ async function checkSpace(s: Session, spaceId: string, shared = false) {
  * Rows the viewer can see: the shared side of spaces they can access, and
  * their own private side. Row-level security applies the same rule.
  */
-function visible(s: Session, table: string) {
+export function visible(s: Session, table: string) {
   const t = s.tx(table);
   return s.tx`
     ${t}.space_id in (${accessibleSpaces(s)})
@@ -361,19 +374,41 @@ function visible(s: Session, table: string) {
   `;
 }
 
-/** Items that nothing the viewer can see has replaced. */
-function current(s: Session, table: string) {
+/**
+ * Items the viewer can see: the visible ones, plus guidance that reaches
+ * them from a space above, even one they can't open. Only for reading;
+ * writes need the space itself.
+ */
+export function visibleContent(s: Session, table: string) {
+  const t = s.tx(table);
+  return s.tx`(
+    ${visible(s, table)}
+    or (
+      ${t}.reaches_down
+      and ${t}.space_id in (select guidance_reach())
+      and (${t}.private_to is null or ${t}.private_to = ${personOf(s.principal) ?? null}::uuid)
+    )
+  )`;
+}
+
+/** Items that nothing the viewer can see has replaced or removed. */
+export function current(s: Session, table: string) {
   return s.tx`not exists (
     select from content replacement
-    where replacement.supersedes = ${s.tx(table)}.id and ${visible(s, 'replacement')}
+    where replacement.supersedes = ${s.tx(table)}.id and ${visibleContent(s, 'replacement')}
   )`;
+}
+
+/** Knowledge pages, not guidance. */
+function knowledge(s: Session, table: string) {
+  return s.tx`${s.tx(table)}.type is distinct from 'guidance'`;
 }
 
 /** The page's title as the viewer sees it: their own if they named it, otherwise the shared one. */
 function titleOf(s: Session, pageId: ReturnType<Session['tx']>) {
   return s.tx`(
     select t.body from content t
-    where t.page_id = ${pageId} and t.kind = 'title' and ${visible(s, 't')}
+    where t.page_id = ${pageId} and t.kind = 'title' and ${visibleContent(s, 't')}
     order by t.private_to is null
     limit 1
   )`;

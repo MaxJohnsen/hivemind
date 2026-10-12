@@ -1,11 +1,13 @@
-// End to end through MCP, as issue #2 asks: an agent saves knowledge to a
-// client space with remember, a new session finds it with context and search,
-// and another person can't see it.
+// End to end through MCP. Issue #2: an agent saves knowledge to a client
+// space with remember, a new session finds it with context and search, and
+// another person can't see it. Issue #3: a client's rules reach a project
+// below it in context, in order, and only people change them.
 
 import assert from 'node:assert/strict';
 import type { AddressInfo, Server } from 'node:net';
 import { after, before, test } from 'node:test';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { addRule } from '../src/guidance.ts';
 import { createPage, writeItem } from '../src/knowledge.ts';
 import { startServer } from '../src/server.ts';
 import { addMember, createSpace } from '../src/spaces.ts';
@@ -153,6 +155,49 @@ test('remember never rewrites shared knowledge', async () => {
   assert.equal(attempt.failed, true);
   assert.match(attempt.text, /can't rewrite shared knowledge/);
   await anas.close();
+});
+
+test('a client’s rules reach a closed project below it, from least to most specific', async () => {
+  const ana = await person('Ana');
+  const gunnar = await person('Gunnar');
+  const workshop = await as({ ...ana, direct: true }, async (s) => {
+    const acme = await createSpace(s, { name: 'Acme' });
+    const workshop = await createSpace(s, { name: 'Workshop', parentId: acme, closed: true });
+    await addMember(s, workshop, gunnar.id);
+    await addRule(s, { spaceId: acme, kind: 'requirement', body: 'Never send prices by email', shared: true });
+    await addRule(s, { spaceId: acme, kind: 'preference', body: 'Write reports in English', shared: true });
+    await addRule(s, { spaceId: acme, kind: 'preference', body: 'Log hours every Friday', shared: true, onlyHere: true });
+    await addRule(s, { spaceId: workshop, kind: 'preference', body: 'Write reports in Norwegian', shared: true });
+    return workshop;
+  });
+
+  // Gunnar, from the client, is only in the workshop and can't open Acme.
+  const gunnars = await session(await as(gunnar, (s) => createToken(s, 'Claude Code')));
+  const context = (await gunnars.call('context', { request: 'Write the workshop report', space: `space:${workshop}` })).text;
+  const rules = context
+    .split('\n## ')
+    .find((block) => block.startsWith('Rules\n'))
+    ?.split('\n')
+    .filter((line) => line.startsWith('- '))
+    .map((line) => line.replace(/ \(item:[^)]+\)$/, ''));
+  assert.deepEqual(rules, [
+    '- Requirement, from a space above: Never send prices by email',
+    '- Preference, from a space above: Write reports in English',
+    '- Preference, from Workshop: Write reports in Norwegian',
+  ]);
+  assert.match(context, /No preference wins over a requirement/);
+  assert.doesNotMatch(context, /Acme/);
+
+  // His agent can't add a rule.
+  const attempt = await gunnars.call('remember', {
+    space: `space:${workshop}`,
+    page: 'Rules',
+    type: 'guidance',
+    text: 'Write reports in French',
+  });
+  assert.equal(attempt.failed, true);
+  assert.match(attempt.text, /Only people change guidance/);
+  await gunnars.close();
 });
 
 test('only valid tokens are accepted, and revoked ones stop working', async () => {

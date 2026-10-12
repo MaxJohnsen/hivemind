@@ -15,17 +15,18 @@ npm test                  # recreates the test database and runs the tests
 
 ### Trying it with Claude Code
 
-Until Hivemind has sign-in, a small command-line tool sets up people, spaces and tokens. Each command prints what it creates.
+Until Hivemind has sign-in, a small command-line tool sets up people, spaces, tokens and rules. Each command prints what it creates, and `node src/cli.ts` lists them all.
 
 ```sh
 docker compose up -d --build
 docker compose exec hivemind node src/cli.ts add-person "Your name"
 docker compose exec hivemind node src/cli.ts add-space <your id> "A client"
 docker compose exec hivemind node src/cli.ts add-token <your id> "Claude Code"
+docker compose exec hivemind node src/cli.ts add-rule <your id> <space id> preference "Write reports in English"
 claude mcp add --transport http hivemind http://localhost:4100/mcp --header "Authorization: Bearer <token>"
 ```
 
-Then ask Claude Code to remember something for that client, and ask about it in a new session.
+Then ask Claude Code to remember something for that client, and ask about it in a new session. Ask it to write a report for the client, and the rule comes with the context.
 
 ## Releasing
 

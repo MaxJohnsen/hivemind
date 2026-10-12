@@ -128,6 +128,17 @@ test('a replacement stays on its page, on a side that can see what it replaces',
   await assert.rejects(replace(otherPage, decision.id, cara.id), { code: '23503' });
 });
 
+test('knowledge is replaced, never removed', async () => {
+  const { cara, space, page, decision } = await acme();
+  await assert.rejects(
+    as(cara, (s) => s.tx`
+      insert into content (space_id, page_id, kind, body, supersedes)
+      values (${space}, ${page}, 'removed', '', ${decision.id})
+    `),
+    refused,
+  );
+});
+
 test('only the writer of an item adds sources to it', async () => {
   const { cara, space, decision } = await acme();
   const rumour = await as(cara, (s) => addSource(s, { spaceId: space, excerpt: 'Discounts are going away' }));
@@ -146,9 +157,11 @@ test('a page has one title on each side', async () => {
   );
 });
 
-test('guidance and skill pages are reserved', async () => {
+test('knowledge can’t pose as guidance', async () => {
   const { ana, space } = await acme();
-  for (const type of ['guidance', 'Skill']) {
+  for (const type of ['Guidance', 'skill']) {
     await assert.rejects(as(ana, (s) => createPage(s, { spaceId: space, title: 'Rules', type })), { code: '23514' });
   }
+  // A real guidance page holds only what people write directly.
+  await assert.rejects(as(ana, (s) => createPage(s, { spaceId: space, title: 'Rules', type: 'guidance' })), refused);
 });
