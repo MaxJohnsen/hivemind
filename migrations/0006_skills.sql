@@ -1,7 +1,8 @@
 -- Skills (spec §2): instructions plus files such as references and scripts,
 -- kept on a skill page exactly as they were imported, so a skill stays a
--- SKILL.md folder in the agent skills format. Like rules, only people change
--- skills, and they reach the spaces below their own.
+-- SKILL.md folder in the Agent Skills format. Like rules, only people change
+-- skills, they reach the spaces below their own, and removing a file, or the
+-- skill's name and with it the skill, adds a removal that keeps the history.
 
 alter table pages
   drop constraint pages_type_check,
@@ -17,7 +18,7 @@ alter table content
 -- Only people change guidance, which includes skills. Shared guidance is
 -- changed by the space's admins, and private guidance by its owner, which
 -- row-level security already ensures. Each kind of page holds only its own
--- kinds of item.
+-- kinds of item, and all of a skill reaches down.
 create or replace function check_guidance() returns trigger
 language plpgsql security definer set search_path = public, pg_temp
 as $$
@@ -31,6 +32,9 @@ begin
   end) then
     raise exception 'that kind of item doesn''t belong on this page' using errcode = 'check_violation';
   end if;
+  if page_type = 'skill' and not new.reaches_down then
+    raise exception 'a skill applies in the spaces below its own' using errcode = 'check_violation';
+  end if;
   if page_type in ('guidance', 'skill') then
     if not direct_edit() then
       raise exception 'only people change guidance' using errcode = 'insufficient_privilege';
@@ -43,32 +47,6 @@ begin
     end if;
   elsif new.reaches_down then
     raise exception 'knowledge never reaches down' using errcode = 'insufficient_privilege';
-  end if;
-  return new;
-end
-$$;
-
--- As before, and a removal can also remove a skill's file, but not its name.
-create or replace function check_replacement() returns trigger
-language plpgsql set search_path = public, pg_temp
-as $$
-begin
-  if not exists (
-    select from content replaced
-    where replaced.id = new.supersedes
-      and case new.kind
-        when 'text' then
-          replaced.kind = 'text'
-          and (new.private_to is not null or replaced.private_to is null)
-          and (current_agent() is null or replaced.agent is not null or replaced.written_by is null)
-        when 'removed' then
-          replaced.kind in ('requirement', 'preference', 'file')
-          and replaced.private_to is not distinct from new.private_to
-          and replaced.reaches_down = new.reaches_down
-        else false
-      end
-  ) then
-    raise exception 'that item can''t be replaced' using errcode = 'insufficient_privilege';
   end if;
   return new;
 end

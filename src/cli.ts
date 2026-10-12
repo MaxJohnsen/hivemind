@@ -3,7 +3,7 @@
 
 import { connect, withPrincipal } from './db.ts';
 import { addRule, editRule, removeRule, rulesFor, type Rule, type RuleKind } from './guidance.ts';
-import { readSkillFolder, saveSkill, skillsFor } from './skills.ts';
+import { readSkillFolder, removeSkill, saveSkill, skillsFor } from './skills.ts';
 import { addMember, createPerson, createSpace, listSpaces, type Space } from './spaces.ts';
 import { createToken, revokeTokens } from './tokens.ts';
 
@@ -24,6 +24,7 @@ const usage = `Usage: node src/cli.ts <command>
   skills <person> <space>                 The skills that apply in a space
   import-skill <person> <space> <folder> [--private]
                                           Adds a SKILL.md folder, or updates the skill with its name
+  remove-skill <person> <skill>
 
 Rules and skills are shared with the space unless --private is given, or
 the space is in your personal tree. They also apply in the spaces below
@@ -96,6 +97,9 @@ try {
       if (skipped.length) console.log(`Skipped hidden files: ${skipped.join(', ')}.`);
       if (shared) console.log(reach(space));
     });
+  } else if (command === 'remove-skill' && args.length === 2) {
+    const removed = await as(args[0], (s) => removeSkill(s, args[1]));
+    console.log(removed ? 'Removed. It stays in the history.' : 'There is no skill with that id that you can change.');
   } else {
     console.error(usage);
     process.exitCode = 1;

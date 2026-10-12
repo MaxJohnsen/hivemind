@@ -242,6 +242,12 @@ test('a client’s skills reach a project below it, and read back whole', async 
   assert.ok(skill.includes(skillMd('status-report', 'Writes the workshop report')));
   const tone = /- references\/tone\.md \((item:[^)]+)\)/.exec(skill)?.[1];
   assert.match((await gunnars.call('read', { ref: tone })).text, /^Plain and short\./);
+
+  // His agent can't write on it.
+  const page = refIn(skills![1], 'page');
+  const attempt = await gunnars.call('remember', { space: `space:${workshop}`, page, text: 'Always add a summary' });
+  assert.equal(attempt.failed, true);
+  assert.match(attempt.text, /Only people change guidance/);
   await gunnars.close();
 });
 

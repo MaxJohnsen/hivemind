@@ -63,7 +63,7 @@ Guidance is rules and skills. It applies down the tree, the more specific rule w
 **Stored like knowledge.** Guidance uses the same pages and content as knowledge (§3), with its own rules for who may write it, how far it reaches and how it loads. There are two reserved page types, fixed when the page is created:
 
 - A **guidance page.** One per space, with one item per rule. A rule is a requirement or a preference, and can be marked *only here*. It exports as AGENTS.md.
-- A **skill page.** Instructions plus files such as references and scripts, kept as a SKILL.md folder in the agent skills format, so it comes back out as it went in. It can be served as `skill://` resources. Hivemind makes skills available; whether an agent can run a skill's scripts depends on its client.
+- A **skill page.** Instructions plus files such as references and scripts, kept as a SKILL.md folder in the [Agent Skills](https://agentskills.io/specification) format, so it comes back out as it went in. It can be served as `skill://` resources. Hivemind makes skills available; whether an agent can run a skill's scripts depends on its client.
 
 Hivemind picks the rules that apply and puts them in order, and requirements always load. Skills are picked by relevance.
 

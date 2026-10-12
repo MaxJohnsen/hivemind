@@ -365,6 +365,7 @@ async function pageFor(s: Session, spaceId: string, page?: string, type?: string
     const id = parseRef(page, 'page');
     const found = await readPage(s, id);
     if (found?.spaceId !== spaceId) throw new Refused('There is no page with that reference in this space that you can see.');
+    if (found.type === 'guidance' || found.type === 'skill') throw new Refused(onlyPeople);
     return { id, title: found.title, created: false };
   }
   const title = page ?? 'Notes';

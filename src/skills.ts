@@ -23,29 +23,40 @@ export interface Skill {
   privateTo: string | null;
 }
 
+/** The largest file Hivemind keeps in a skill for now, so it can still be searched. */
+const largest = 512 * 1024;
+
 /**
- * Reads a skill folder in the agent skills format: a SKILL.md with a name
+ * Reads a skill folder in the Agent Skills format: a SKILL.md with a name
  * and a description, and any other files. Hidden files, such as .DS_Store,
- * are skipped and listed. Hivemind keeps only text files for now, so a
- * folder with other files is refused as a whole.
+ * are skipped and listed. Hivemind keeps only text files up to 512 KB for
+ * now, and doesn't follow links, so a folder with anything else is refused
+ * as a whole, naming what it can't keep.
  */
 export async function readSkillFolder(folder: string): Promise<{ files: SkillFile[]; skipped: string[] }> {
   const files: SkillFile[] = [];
   const skipped: string[] = [];
-  const binary: string[] = [];
+  const refused = { links: [] as string[], binary: [] as string[], large: [] as string[] };
   for (const entry of await readdir(folder, { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile()) continue;
+    if (entry.isDirectory()) continue;
     const path = relative(folder, join(entry.parentPath, entry.name)).split(sep).join('/');
-    if (path.split('/').some((part) => part.startsWith('.'))) {
-      skipped.push(path);
-      continue;
+    if (path.split('/').some((part) => part.startsWith('.'))) skipped.push(path);
+    else if (!entry.isFile()) refused.links.push(path);
+    else {
+      const bytes = await readFile(join(folder, path));
+      const body = asText(bytes);
+      if (body === undefined) refused.binary.push(path);
+      else if (bytes.length > largest) refused.large.push(path);
+      else files.push({ path, body });
     }
-    const body = asText(await readFile(join(folder, path)));
-    if (body === undefined) binary.push(path);
-    else files.push({ path, body });
   }
-  if (binary.length) {
-    throw new Error(`Hivemind keeps only text files in skills for now. These aren't text: ${binary.sort().join(', ')}.`);
+  const problems = [
+    refused.binary.length && `These aren't text: ${refused.binary.sort().join(', ')}.`,
+    refused.large.length && `These are larger than 512 KB: ${refused.large.sort().join(', ')}.`,
+    refused.links.length && `These are links, which Hivemind doesn't follow: ${refused.links.sort().join(', ')}.`,
+  ].filter(Boolean);
+  if (problems.length) {
+    throw new Error(`Hivemind keeps only text files up to 512 KB in skills for now. ${problems.join(' ')}`);
   }
   return { files: files.sort((a, b) => a.path.localeCompare(b.path)), skipped: skipped.sort() };
 }
@@ -65,7 +76,7 @@ export async function saveSkill(s: Session, input: { spaceId: string; files: Ski
     select t.page_id from content t
     join pages p on p.id = t.page_id and p.type = 'skill'
     where t.space_id = ${input.spaceId}::uuid and t.kind = 'title' and t.body = ${name}
-      and t.private_to is not distinct from ${privateTo}::uuid and ${visible(s, 't')}
+      and t.private_to is not distinct from ${privateTo}::uuid and ${visible(s, 't')} and ${current(s, 't')}
   `;
   const pageId = existing?.pageId ?? randomUUID();
   const item = { pageId, spaceId: input.spaceId, privateTo, reachesDown: true };
@@ -99,6 +110,22 @@ export async function saveSkill(s: Session, input: { spaceId: string; files: Ski
 }
 
 /**
+ * Removes a skill, with all its files, for everyone it reaches. It stays in
+ * the history, and an inherited skill with the same name applies again.
+ */
+export async function removeSkill(s: Session, pageId: string): Promise<boolean> {
+  const items = await s.tx<Item[]>`
+    select ${itemColumns(s)} from content
+    where page_id = ${pageId}::uuid and page_id in (select id from pages where type = 'skill')
+      and kind in ('title', 'file') and ${visible(s, 'content')} and ${current(s, 'content')}
+  `;
+  for (const item of items) {
+    await insertItem(s, { ...item, kind: 'removed', body: '', supersedes: item.id, path: null });
+  }
+  return items.some((item) => item.kind === 'title');
+}
+
+/**
  * The skills that apply in a space, by name. A skill in a more specific
  * space replaces an inherited one with the same name, personal skills are
  * the least specific, and between equally specific ones the private one
@@ -107,15 +134,18 @@ export async function saveSkill(s: Session, input: { spaceId: string; files: Ski
 export async function skillsFor(s: Session, spaceId: string): Promise<Skill[]> {
   const skills = await s.tx<(Omit<Skill, 'description'> & { skillMd: string | null })[]>`
     ${applying(s, spaceId)}
-    select distinct on (t.body) t.page_id, t.body as name, t.space_id, sp.name as space_name, t.private_to, (
+    select distinct on (t.body) t.page_id, t.body as name, t.space_id, sp.name as space_name, t.private_to, f.body as skill_md
+    from applies a
+    join content t on t.space_id = a.space_id and t.kind = 'title'
+    join pages p on p.id = t.page_id and p.type = 'skill'
+    join lateral (
       select f.body from content f
       where f.page_id = t.page_id and f.kind = 'file' and f.path = 'SKILL.md'
         and f.private_to is not distinct from t.private_to
         and ${visibleContent(s, 'f')} and ${current(s, 'f')}
-    ) as skill_md
-    from applies a
-    join content t on t.space_id = a.space_id and t.kind = 'title'
-    join pages p on p.id = t.page_id and p.type = 'skill'
+      order by f.created_at
+      limit 1
+    ) f on true
     left join spaces sp on sp.id = t.space_id and sp.id in (${accessibleSpaces(s)})
     where ${visibleContent(s, 't')}
     order by t.body, a.distance, t.private_to is null
@@ -131,12 +161,14 @@ function describe(files: SkillFile[]): { name: string; description: string } {
   if (!name || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name) || name.length > 64) {
     throw new Error('SKILL.md needs a name in its frontmatter, in lowercase letters, numbers and hyphens, such as status-report.');
   }
-  if (!description) throw new Error('SKILL.md needs a description in its frontmatter, saying what the skill does and when to use it.');
+  if (!description || description.length > 1024) {
+    throw new Error('SKILL.md needs a description of up to 1024 characters in its frontmatter, saying what the skill does and when to use it.');
+  }
   return { name, description };
 }
 
 function frontmatter(skillMd: string): { name?: string; description?: string } {
-  const yaml = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/.exec(skillMd)?.[1];
+  const yaml = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/.exec(skillMd)?.[1];
   try {
     const fields = yaml ? parse(yaml) : undefined;
     const text = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : undefined);
@@ -150,7 +182,7 @@ function frontmatter(skillMd: string): { name?: string; description?: string } {
 function asText(bytes: Buffer): string | undefined {
   if (bytes.includes(0)) return undefined;
   try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
     return undefined;
   }

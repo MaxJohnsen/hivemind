@@ -255,9 +255,10 @@ export async function search(
       ? s.tx`and ${s.tx(table)}.space_id in (select space_subtree(${options.spaceId}::uuid))`
       : s.tx``;
 
-  // A match in a skill's file finds the skill.
-  const hits = await s.tx<Hit[]>`
+  // A match in a skill's current files finds the skill, once.
+  return s.tx<Hit[]>`
     select kind, id, space_id, page_id, page_type, title, text, private, superseded, updates_shared from (
+    select distinct on (kind, id) * from (
       select case when c.kind in ('title', 'file') then 'page' else 'item' end as kind,
              case when c.kind in ('title', 'file') then c.page_id else c.id end as id,
              c.space_id, c.page_id, p.type as page_type, ${titleOf(s, s.tx`c.page_id`)} as title,
@@ -271,6 +272,7 @@ export async function search(
       join pages p on p.id = c.page_id
       where c.search @@ to_tsquery('simple', ${terms}) and ${visibleContent(s, 'c')} ${within('c')}
         and ${options.knowledge ? knowledge(s, 'p') : s.tx`true`}
+        and (c.kind <> 'file' or ${current(s, 'c')})
       union all
       select 'source', src.id, src.space_id, null, null, src.reference, src.excerpt, src.private_to is not null, false, false,
              ts_rank(src.search, to_tsquery('simple', ${terms}), 1)
@@ -278,10 +280,11 @@ export async function search(
       where src.search @@ to_tsquery('simple', ${terms}) and ${visible(s, 'src')} ${within('src')}
     ) hits
     where not (${options.current ?? false} and superseded)
+    order by kind, id, superseded, rank desc
+    ) best
     order by superseded, rank desc
     limit ${options.limit ?? 20}
   `;
-  return hits.filter((hit, i) => hits.findIndex((other) => other.kind === hit.kind && other.id === hit.id) === i);
 }
 
 export function itemColumns(s: Session) {
