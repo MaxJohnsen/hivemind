@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: hivemind
+      POSTGRES_PASSWORD: hivemind
+      POSTGRES_DB: hivemind
+    ports:
+      - "127.0.0.1:${HIVEMIND_DB_PORT:-5442}:5432"
+    volumes:
+      - db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hivemind"]
+      interval: 2s
+      retries: 30
+
+volumes:
+  db:

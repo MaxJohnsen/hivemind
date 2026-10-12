@@ -4,7 +4,7 @@ Guidance for AI agents working in this repository.
 
 ## What this repository is
 
-Hivemind is being designed, so for now the documents are the product. Each one has a job:
+Hivemind is being designed and built in the open. The documents describe it, and each one has a job:
 
 - `README.md` makes people interested. It starts with the problem.
 - `docs/concept.md` explains the idea in plain language, without technology.
@@ -32,9 +32,23 @@ This repository should read as if people wrote it for people.
 - Build the simplest implementation that satisfies the spec. Don't build complexity the spec only anticipates.
 - Work one issue at a time, in small pull requests. Each issue says what someone can do when it is done.
 - Each pull request says what changed, why, and how it was tested.
-- The cross-client leak test (guarantee 2) runs on every change.
+- The cross-client leak test (guarantee 2) runs on every change. `npm run check` and `npm test` must pass; the tests need the database from `docker compose up -d`.
+- A new table holding space data carries `space_id` and `private_to`, gets row-level security, and is added to the leak test.
 - Agree on UI design, component library and guidelines with the maintainer before building any screen people use.
 - The plan can change. If using Hivemind shows a better order, adapt.
+
+## How we test
+
+Tests show that Hivemind keeps its promises. A good test reads like a short story from the spec and fails only when something that matters breaks.
+
+- Test behavior through Hivemind's own operations, against a real database. Don't mock Hivemind's code; fake only outside systems, at the edge.
+- Most tests are integration tests like that. Each issue's "Done when" becomes one end-to-end test through the real interface, such as an MCP client. Unit tests are for pure logic with many cases.
+- Name a test after the behavior it proves: "removing a member takes effect immediately".
+- Use one small cast and realistic data, so a leak would be obvious: Ana works for Acme, Ben for Beta, and Cara is Ana's colleague.
+- Each test creates its own people, so tests don't depend on each other or on order.
+- A protection counts as tested only if breaking it makes a test fail. For anything that guards access, break it once and watch the test fail.
+- Fix a bug by first writing the test that shows it.
+- Don't test what the type checker, the database or a library already guarantees, and don't write tests to raise coverage.
 
 ## Changing the design
 
