@@ -41,7 +41,8 @@ export async function withPrincipal<T>(
   return (await sql.begin(async (tx) => {
     await tx`
       select set_config('hivemind.person_id', ${person}, true),
-             set_config('hivemind.space_id', ${space}, true)
+             set_config('hivemind.space_id', ${space}, true),
+             set_config('hivemind.agent', ${principal.agent ?? ''}, true)
     `;
     return fn({ tx, principal });
   })) as T;

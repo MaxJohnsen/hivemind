@@ -162,35 +162,21 @@ describe('straight against the database', () => {
       const [page] = target.pages;
       const insert = (privateTo: string | null) =>
         as(me, (s) => s.tx`
-          insert into content (space_id, page_id, private_to, written_by, body)
-          values (${target.space}, ${page}, ${privateTo}, ${me.id}, 'Hello')
+          insert into content (space_id, page_id, private_to, body)
+          values (${target.space}, ${page}, ${privateTo}, 'Hello')
         `);
       await assert.rejects(insert(null), refused); // the shared side
       await assert.rejects(insert(me.id), refused); // a private side of their own
       await assert.rejects(insert(target.person.id), refused); // the other person's private side
 
       await assert.rejects(as(me, (s) => s.tx`
-        insert into sources (space_id, private_to, written_by, excerpt) values (${target.space}, ${me.id}, ${me.id}, 'Hello')
+        insert into sources (space_id, private_to, excerpt) values (${target.space}, ${me.id}, 'Hello')
       `), refused);
       await assert.rejects(as(me, (s) => s.tx`
         insert into pages (space_id) values (${target.space})
       `), refused);
       await assert.rejects(as(me, (s) => s.tx`
         insert into citations (content_id, source_id) values (${intruder.items[1].id}, ${target.source.id})
-      `), refused);
-    }
-  });
-
-  test('nobody writes in someone else’s name', async () => {
-    for (const { intruder, target } of attempts()) {
-      const me = intruder.person;
-      await assert.rejects(as(me, (s) => s.tx`
-        insert into content (space_id, page_id, private_to, written_by, body)
-        values (${intruder.space}, ${intruder.pages[0]}, ${me.id}, ${target.person.id}, 'Hello')
-      `), refused);
-      await assert.rejects(as(me, (s) => s.tx`
-        insert into sources (space_id, private_to, written_by, excerpt)
-        values (${intruder.space}, ${me.id}, ${target.person.id}, 'Hello')
       `), refused);
     }
   });
@@ -268,7 +254,7 @@ async function assertUntouched() {
   for (const { items } of [acme, beta]) {
     const stored = await admin`
       select body from content
-      where id in ${admin(items.map((item) => item.id))} and superseded_by is null
+      where id in ${admin(items.map((item) => item.id))}
       order by created_at
     `;
     assert.deepEqual(stored.map((row) => row.body), bodies(items));

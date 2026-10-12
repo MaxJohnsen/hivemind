@@ -77,7 +77,7 @@ test('your personal tree is yours alone', async () => {
   );
   await assert.rejects(
     as(ana, (s) => s.tx`
-      insert into content (space_id, page_id, written_by, body) values (${sideProject}, ${ideas}, ${ana.id}, 'An idea')
+      insert into content (space_id, page_id, body) values (${sideProject}, ${ideas}, 'An idea')
     `),
     refused,
   );
