@@ -47,4 +47,4 @@ Hivemind is being designed in the open. The concept and the specification are wr
 
 ## License
 
-[AGPL-3.0](LICENSE). Please read [CONTRIBUTING](CONTRIBUTING.md) before opening a pull request.
+Copyright © 2026 Max Aasbø. Licensed under [AGPL-3.0](LICENSE). Please read [CONTRIBUTING](CONTRIBUTING.md) before opening a pull request.
