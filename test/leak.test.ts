@@ -2,8 +2,8 @@
 //
 // Ana works for Acme and Ben for Beta. Each has a page of knowledge on their
 // client's shared side, a private note on it that cites an email and has an
-// earlier version, notes in their personal space, and a shared and a private
-// rule for their client. Each tries to read and
+// earlier version, notes in their personal space, a shared and a private
+// rule for their client, and a skill. Each tries to read and
 // change the other's, in three ways: through Hivemind, through Hivemind with
 // row-level security off, and straight against the database with Hivemind's
 // filters bypassed. So each layer is shown to refuse on its own.
@@ -25,6 +25,7 @@ import {
   type Item,
   type Source,
 } from '../src/knowledge.ts';
+import { saveSkill, skillsFor } from '../src/skills.ts';
 import { addMember, createSpace, listSpaces, peopleNames } from '../src/spaces.ts';
 import { admin, as, db, person, refused, type Person } from './helpers.ts';
 
@@ -35,6 +36,7 @@ interface Client {
   pages: string[];
   items: Item[];
   rules: Item[];
+  skill: { pageId: string; name: string };
   source: Source;
 }
 
@@ -50,6 +52,7 @@ before(async () => {
     personal: 'Ana has a dentist appointment on Friday',
     rule: 'Never send Acme prices by email',
     privateRule: 'Ana writes Acme reports in Norwegian',
+    skill: 'acme-status-report',
   });
   beta = await client('Beta', 'Ben', {
     shared: 'Beta’s budget is approved',
@@ -59,6 +62,7 @@ before(async () => {
     personal: 'Ben picks up the kids on Thursdays',
     rule: 'Copy Beta’s CFO on every invoice',
     privateRule: 'Ben keeps Beta updates short',
+    skill: 'beta-budget-review',
   });
 });
 
@@ -138,6 +142,11 @@ for (const [layer, sql] of [
         await as(intruder.person, async (s) => {
           assert.deepEqual(bodies(await rulesFor(s, target.space)), []);
           assert.deepEqual(bodies(await rulesFor(s, intruder.space)), bodies(intruder.rules));
+          assert.equal((await skillsFor(s, target.space)).length, 0);
+          assert.deepEqual((await skillsFor(s, intruder.space)).map((skill) => skill.pageId), [intruder.skill.pageId]);
+          assert.equal(await readPage(s, target.skill.pageId), undefined);
+          const found = await search(s, target.skill.name.replaceAll('-', ' '));
+          assert.ok(found.every((hit) => hit.spaceId === intruder.space || hit.spaceId === intruder.person.personalSpaceId));
           for (const rule of target.rules) {
             assert.equal(await readItem(s, rule.id), undefined);
             const hits = await search(s, rule.body);
@@ -158,6 +167,8 @@ for (const [layer, sql] of [
           assert.equal(await as(me, (s) => editRule(s, id, 'Changed'), sql), undefined);
           assert.equal(await as(me, (s) => removeRule(s, id), sql), false);
         }
+        const skill = [{ path: 'SKILL.md', body: '---\nname: hello\ndescription: Hello\n---\n' }];
+        await assert.rejects(as(me, (s) => saveSkill(s, { spaceId: target.space, files: skill, shared: true }), sql), AccessDenied);
       }
       await assertUntouched();
     });
@@ -166,7 +177,7 @@ for (const [layer, sql] of [
 
 describe('straight against the database', () => {
   test('each person reads only their own client’s rows', async () => {
-    for (const { name, person, items, rules: ownRules, source } of [acme, beta]) {
+    for (const { name, person, items, rules: ownRules, skill, source } of [acme, beta]) {
       await as(person, async (s) => {
         const texts = await s.tx`select body from content where kind = 'text' order by created_at`;
         const rules = await s.tx`select body from content where kind in ('requirement', 'preference') order by created_at`;
@@ -182,11 +193,11 @@ describe('straight against the database', () => {
 
         assert.deepEqual(texts.map((row) => row.body), bodies(items));
         assert.deepEqual(rules.map((row) => row.body), bodies(ownRules));
-        assert.deepEqual(titles.map((row) => row.body), [`${name} plans`, 'Notes']);
+        assert.deepEqual(titles.map((row) => row.body), [`${name} plans`, 'Notes', skill.name]);
         assert.deepEqual(sources.map((row) => row.excerpt), [source.excerpt]);
         assert.equal(history.length, 1);
         assert.deepEqual(citations.map((row) => row.sourceId), [source.id]);
-        assert.equal(pages.length, 3);
+        assert.equal(pages.length, 4);
         assert.deepEqual(spaces.map((row) => row.name), ['Personal', name]);
         assert.deepEqual(people.map((row) => row.name), [person.name]);
         assert.deepEqual(members.map((row) => row.personId), [person.id]);
@@ -280,7 +291,16 @@ describe('straight against the database', () => {
 async function client(
   name: string,
   personName: string,
-  notes: { shared: string; draft: string; private: string; email: string; personal: string; rule: string; privateRule: string },
+  notes: {
+    shared: string;
+    draft: string;
+    private: string;
+    email: string;
+    personal: string;
+    rule: string;
+    privateRule: string;
+    skill: string;
+  },
 ): Promise<Client> {
   const p = await person(personName);
   return as({ ...p, direct: true }, async (s) => {
@@ -296,7 +316,18 @@ async function client(
       await addRule(s, { spaceId: space, kind: 'requirement', body: notes.rule, shared: true }),
       await addRule(s, { spaceId: space, kind: 'preference', body: notes.privateRule }),
     ];
-    return { name, person: p, space, pages: [page, personalPage], items: [shared, changed!, personal], rules, source };
+    const skillMd = `---\nname: ${notes.skill}\ndescription: How ${name} wants it done\n---\n\nSteps for ${notes.skill.replaceAll('-', ' ')}\n`;
+    const skill = await saveSkill(s, { spaceId: space, files: [{ path: 'SKILL.md', body: skillMd }], shared: true });
+    return {
+      name,
+      person: p,
+      space,
+      pages: [page, personalPage],
+      items: [shared, changed!, personal],
+      rules,
+      skill: { pageId: skill.pageId, name: skill.name },
+      source,
+    };
   });
 }
 

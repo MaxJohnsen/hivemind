@@ -162,7 +162,7 @@ test('a page has one title on each side', async () => {
 
 test('knowledge can’t pose as guidance', async () => {
   const { ana, space } = await acme();
-  for (const type of ['Guidance', 'skill']) {
+  for (const type of ['Guidance', 'Skill']) {
     await assert.rejects(as(ana, (s) => createPage(s, { spaceId: space, title: 'Rules', type })), { code: '23514' });
   }
 });

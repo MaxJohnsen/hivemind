@@ -1,7 +1,8 @@
 // End to end through MCP. Issue #2: an agent saves knowledge to a client
 // space with remember, a new session finds it with context and search, and
 // another person can't see it. Issue #3: a client's rules reach a project
-// below it in context, in order, and only people change them.
+// below it in context, in order, and only people change them, and skills
+// come with them.
 
 import assert from 'node:assert/strict';
 import type { AddressInfo, Server } from 'node:net';
@@ -9,6 +10,7 @@ import { after, before, test } from 'node:test';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { addRule } from '../src/guidance.ts';
 import { createPage, writeItem } from '../src/knowledge.ts';
+import { saveSkill } from '../src/skills.ts';
 import { startServer } from '../src/server.ts';
 import { addMember, createSpace } from '../src/spaces.ts';
 import { createToken, revokeTokens } from '../src/tokens.ts';
@@ -203,6 +205,43 @@ test('a client’s rules reach a closed project below it, from least to most spe
   const change = await gunnars.call('remember', { space: `space:${acme}`, replaces: english, text: 'Write reports in French' });
   assert.equal(change.failed, true);
   assert.match(change.text, /Only people change guidance/);
+  await gunnars.close();
+});
+
+test('a client’s skills reach a project below it, and read back whole', async () => {
+  const ana = await person('Ana');
+  const gunnar = await person('Gunnar');
+  const skillMd = (name: string, description: string) => `---\nname: ${name}\ndescription: ${description}\n---\n\nSteps\n`;
+  const workshop = await as({ ...ana, direct: true }, async (s) => {
+    const acme = await createSpace(s, { name: 'Acme' });
+    const workshop = await createSpace(s, { name: 'Workshop', parentId: acme, closed: true });
+    await addMember(s, workshop, gunnar.id);
+    const files = (name: string, description: string) => [
+      { path: 'SKILL.md', body: skillMd(name, description) },
+      { path: 'references/tone.md', body: 'Plain and short.' },
+    ];
+    await saveSkill(s, { spaceId: acme, files: files('status-report', 'Writes the status report'), shared: true });
+    await saveSkill(s, { spaceId: acme, files: files('invoice', 'Prepares an invoice'), shared: true });
+    await saveSkill(s, { spaceId: workshop, files: files('status-report', 'Writes the workshop report'), shared: true });
+    return workshop;
+  });
+
+  const gunnars = await session(await as(gunnar, (s) => createToken(s, 'Claude Code')));
+  const context = (await gunnars.call('context', { request: 'Write the workshop report', space: `space:${workshop}` })).text;
+  const skills = context
+    .split('\n## ')
+    .find((block) => block.startsWith('Skills\n'))
+    ?.split('\n')
+    .filter((line) => line.startsWith('- '));
+  assert.deepEqual(skills?.map((line) => line.replace(/ \(page:[^)]+\)$/, '')), [
+    '- invoice: Prepares an invoice',
+    '- status-report: Writes the workshop report',
+  ]);
+
+  const skill = (await gunnars.call('read', { ref: refIn(skills![1], 'page') })).text;
+  assert.ok(skill.includes(skillMd('status-report', 'Writes the workshop report')));
+  const tone = /- references\/tone\.md \((item:[^)]+)\)/.exec(skill)?.[1];
+  assert.match((await gunnars.call('read', { ref: tone })).text, /^Plain and short\./);
   await gunnars.close();
 });
 

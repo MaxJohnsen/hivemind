@@ -1,8 +1,9 @@
-// Sets up people, spaces, tokens and guidance, until Hivemind has sign-in
-// and a web app. Everything here is a person editing directly.
+// Sets up people, spaces, tokens, rules and skills, until Hivemind has
+// sign-in and a web app. Everything here is a person editing directly.
 
 import { connect, withPrincipal } from './db.ts';
 import { addRule, editRule, removeRule, rulesFor, type Rule, type RuleKind } from './guidance.ts';
+import { readSkillFolder, saveSkill, skillsFor } from './skills.ts';
 import { addMember, createPerson, createSpace, listSpaces, type Space } from './spaces.ts';
 import { createToken, revokeTokens } from './tokens.ts';
 
@@ -20,9 +21,13 @@ const usage = `Usage: node src/cli.ts <command>
   edit-rule <person> <rule> <text>
   remove-rule <person> <rule>
 
-Rules are shared with the space unless --private is given, or the space is
-in your personal tree. A rule also applies in the spaces below its own
-unless --only-here is given.`;
+  skills <person> <space>                 The skills that apply in a space
+  import-skill <person> <space> <folder> [--private]
+                                          Adds a SKILL.md folder, or updates the skill with its name
+
+Rules and skills are shared with the space unless --private is given, or
+the space is in your personal tree. They also apply in the spaces below
+their own. A rule can be kept to its space with --only-here.`;
 
 const sql = connect();
 const [command, ...rest] = process.argv.slice(2);
@@ -68,6 +73,29 @@ try {
   } else if (command === 'remove-rule' && args.length === 2) {
     const removed = await as(args[0], (s) => removeRule(s, args[1]));
     console.log(removed ? 'Removed. It stays in the history.' : 'There is no rule with that id that you can change.');
+  } else if (command === 'skills' && args.length === 2) {
+    const skills = await as(args[0], (s) => skillsFor(s, args[1]));
+    if (skills.length === 0) console.log('  None');
+    for (const skill of skills) {
+      const from = [skill.spaceName ?? 'a space above', skill.privateTo && 'private'].filter(Boolean).join(', ');
+      console.log(`  ${skill.pageId}  ${skill.name} (${from}): ${skill.description}`);
+    }
+  } else if (command === 'import-skill' && args.length === 3) {
+    const [person, spaceId, folder] = args;
+    const { files, skipped } = await readSkillFolder(folder);
+    await as(person, async (s) => {
+      const space = await spaceById(s, spaceId);
+      const shared = !flags.has('--private') && !space.privateTo;
+      const skill = await saveSkill(s, { spaceId, files, shared });
+      if (skill.created) {
+        console.log(`Added ${skill.name} to ${space.name} as a ${shared ? 'shared' : 'private'} skill with ${files.length} files (${skill.pageId}).`);
+      } else {
+        const changes = [`${skill.changed.length} changed`, `${skill.added.length} added`, `${skill.removed.length} removed`];
+        console.log(`Updated ${skill.name} in ${space.name}: ${changes.join(', ')}. Earlier versions are kept.`);
+      }
+      if (skipped.length) console.log(`Skipped hidden files: ${skipped.join(', ')}.`);
+      if (shared) console.log(reach(space));
+    });
   } else {
     console.error(usage);
     process.exitCode = 1;

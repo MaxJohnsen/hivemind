@@ -15,7 +15,7 @@ npm test                  # recreates the test database and runs the tests
 
 ### Trying it with Claude Code
 
-Until Hivemind has sign-in, a small command-line tool sets up people, spaces, tokens and rules. Each command prints what it creates, and `node src/cli.ts` lists them all.
+Until Hivemind has sign-in, a small command-line tool sets up people, spaces, tokens, rules and skills. Each command prints what it creates, and `node src/cli.ts` lists them all.
 
 ```sh
 docker compose up -d --build
@@ -27,6 +27,12 @@ claude mcp add --transport http hivemind http://localhost:4100/mcp --header "Aut
 ```
 
 Then ask Claude Code to remember something for that client, and ask about it in a new session. Ask it to write a report for the client, and the rule comes with the context.
+
+To add a skill, run the command line from your checkout instead, so it can read the skill's folder on your computer. It connects to the database from Docker Compose.
+
+```sh
+node src/cli.ts import-skill <your id> <space id> ~/skills/status-report
+```
 
 ## Releasing
 
