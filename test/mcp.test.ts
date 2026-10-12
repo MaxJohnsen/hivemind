@@ -160,7 +160,7 @@ test('remember never rewrites shared knowledge', async () => {
 test('a client’s rules reach a closed project below it, from least to most specific', async () => {
   const ana = await person('Ana');
   const gunnar = await person('Gunnar');
-  const workshop = await as({ ...ana, direct: true }, async (s) => {
+  const { acme, workshop } = await as({ ...ana, direct: true }, async (s) => {
     const acme = await createSpace(s, { name: 'Acme' });
     const workshop = await createSpace(s, { name: 'Workshop', parentId: acme, closed: true });
     await addMember(s, workshop, gunnar.id);
@@ -168,7 +168,7 @@ test('a client’s rules reach a closed project below it, from least to most spe
     await addRule(s, { spaceId: acme, kind: 'preference', body: 'Write reports in English', shared: true });
     await addRule(s, { spaceId: acme, kind: 'preference', body: 'Log hours every Friday', shared: true, onlyHere: true });
     await addRule(s, { spaceId: workshop, kind: 'preference', body: 'Write reports in Norwegian', shared: true });
-    return workshop;
+    return { acme, workshop };
   });
 
   // Gunnar, from the client, is only in the workshop and can't open Acme.
@@ -197,6 +197,12 @@ test('a client’s rules reach a closed project below it, from least to most spe
   });
   assert.equal(attempt.failed, true);
   assert.match(attempt.text, /Only people change guidance/);
+
+  // Nor replace one he receives, even naming the space it comes from.
+  const english = refIn(context.split('\n').find((line) => line.includes('in English'))!, 'item');
+  const change = await gunnars.call('remember', { space: `space:${acme}`, replaces: english, text: 'Write reports in French' });
+  assert.equal(change.failed, true);
+  assert.match(change.text, /Only people change guidance/);
   await gunnars.close();
 });
 

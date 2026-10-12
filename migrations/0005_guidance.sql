@@ -90,12 +90,17 @@ grant execute on function guidance_page, guidance_reach, spaces_above to hivemin
 
 -- Only people change guidance. Shared guidance is changed by the space's
 -- admins, and private guidance by its owner, which row-level security
--- already ensures.
+-- already ensures. A guidance page holds only rules and their removals.
 create function check_guidance() returns trigger
 language plpgsql security definer set search_path = public, pg_temp
 as $$
+declare
+  guidance boolean := coalesce((select type = 'guidance' from pages where id = new.page_id), false);
 begin
-  if (select type from pages where id = new.page_id) = 'guidance' then
+  if guidance <> (new.kind in ('requirement', 'preference', 'removed')) then
+    raise exception 'rules belong on a guidance page, and nothing else does' using errcode = 'check_violation';
+  end if;
+  if guidance then
     if not direct_edit() then
       raise exception 'only people change guidance' using errcode = 'insufficient_privilege';
     end if;
@@ -118,8 +123,8 @@ for each row execute function check_guidance();
 
 -- A replacement must replace an item its writer can see. A shared one
 -- replaces only shared knowledge, and agents never replace what people
--- wrote. A removal ends a rule for everyone it reaches, never just for one
--- person. It runs as the writer, so row-level security decides what they
+-- wrote. A removal ends a rule for everyone it reaches, never just for some
+-- of them; check_guidance keeps removals among rules. It runs as the writer, so row-level security decides what they
 -- can see.
 create or replace function check_replacement() returns trigger
 language plpgsql set search_path = public, pg_temp
@@ -134,8 +139,8 @@ begin
           and (new.private_to is not null or replaced.private_to is null)
           and (current_agent() is null or replaced.agent is not null or replaced.written_by is null)
         when 'removed' then
-          replaced.kind in ('requirement', 'preference')
-          and replaced.private_to is not distinct from new.private_to
+          replaced.private_to is not distinct from new.private_to
+          and replaced.reaches_down = new.reaches_down
         else false
       end
   ) then
@@ -145,14 +150,25 @@ begin
 end
 $$;
 
--- Guidance is also visible in the spaces below its own, to everyone there,
--- unless it is marked only here. Private guidance reaches down only for its
--- owner.
+-- Shared guidance is also visible in the spaces below its own, to everyone
+-- there, unless it is marked only here. Private guidance needs no exception:
+-- its owner sees it wherever they can open its space, and it stops applying
+-- when they can't, like the rest of their private side there.
 create policy guidance_reach on content for select
 using (
   reaches_down
+  and private_to is null
   and space_id in (select guidance_reach())
-  and (private_to is null or private_to = current_person_id())
+);
+
+-- Sources back knowledge. Rules have none, so nobody, an agent least of
+-- all, can attach a source to one.
+alter policy visible on citations
+with check (
+  content_id in (
+    select id from content where kind = 'text' and written_by is not distinct from current_person_id()
+  )
+  and source_id in (select id from sources)
 );
 
 grant insert (reaches_down) on content to hivemind_app;

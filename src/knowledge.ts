@@ -375,19 +375,15 @@ export function visible(s: Session, table: string) {
 }
 
 /**
- * Items the viewer can see: the visible ones, plus guidance that reaches
- * them from a space above, even one they can't open. Only for reading;
- * writes need the space itself.
+ * Items the viewer can see: the visible ones, plus shared guidance that
+ * reaches them from a space above, even one they can't open. Only for
+ * reading; writes need the space itself.
  */
 export function visibleContent(s: Session, table: string) {
   const t = s.tx(table);
   return s.tx`(
     ${visible(s, table)}
-    or (
-      ${t}.reaches_down
-      and ${t}.space_id in (select guidance_reach())
-      and (${t}.private_to is null or ${t}.private_to = ${personOf(s.principal) ?? null}::uuid)
-    )
+    or (${t}.reaches_down and ${t}.private_to is null and ${t}.space_id in (select guidance_reach()))
   )`;
 }
 

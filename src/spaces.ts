@@ -58,11 +58,19 @@ export async function listSpaces(s: Session): Promise<Space[]> {
   `;
 }
 
-/** The names of the people with these ids, as far as the session can see them. */
+/**
+ * The names of the people with these ids, as far as the session can see
+ * them: itself, and the members of spaces it can access.
+ */
 export async function peopleNames(s: Session, ids: (string | null)[]): Promise<Map<string, string>> {
   const known = [...new Set(ids.filter((id) => id !== null))];
   if (known.length === 0) return new Map();
-  const people = await s.tx<{ id: string; name: string }[]>`select id, name from people where id in ${s.tx(known)}`;
+  const people = await s.tx<{ id: string; name: string }[]>`
+    select id, name from people
+    where id in ${s.tx(known)}
+      and (id = ${personOf(s.principal) ?? null}::uuid
+           or id in (select person_id from memberships where space_id in (${accessibleSpaces(s)})))
+  `;
   return new Map(people.map((person) => [person.id, person.name]));
 }
 

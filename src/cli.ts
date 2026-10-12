@@ -3,7 +3,7 @@
 
 import { connect, withPrincipal } from './db.ts';
 import { addRule, editRule, removeRule, rulesFor, type Rule, type RuleKind } from './guidance.ts';
-import { addMember, createPerson, createSpace, listSpaces } from './spaces.ts';
+import { addMember, createPerson, createSpace, listSpaces, type Space } from './spaces.ts';
 import { createToken, revokeTokens } from './tokens.ts';
 
 const usage = `Usage: node src/cli.ts <command>
@@ -49,24 +49,22 @@ try {
   } else if (command === 'add-rule' && args.length === 4 && ['requirement', 'preference'].includes(args[2])) {
     const [person, spaceId, kind, body] = args;
     await as(person, async (s) => {
-      const space = (await listSpaces(s)).find((candidate) => candidate.id === spaceId);
-      if (!space) throw new Error('There is no space with that id that you can see.');
+      const space = await spaceById(s, spaceId);
       const shared = !flags.has('--private') && !space.privateTo;
       const onlyHere = flags.has('--only-here');
       console.log(`Rules that already apply in ${space.name}, least specific first:`);
       printRules(await rulesFor(s, spaceId));
       const rule = await addRule(s, { spaceId, kind: kind as RuleKind, body, shared, onlyHere });
       console.log(`\nAdded ${rule.id}, a ${shared ? 'shared' : 'private'} ${kind} in ${space.name}.`);
-      if (shared && !onlyHere) {
-        console.log(
-          `It also applies to the spaces below ${space.name}, including closed ones you can't access, ` +
-            'and their members may receive it. Use --only-here to keep a rule to this space.',
-        );
-      }
+      if (shared && !onlyHere) console.log(`${reach(space)} Use --only-here to keep a rule to this space.`);
     });
   } else if (command === 'edit-rule' && args.length === 3) {
-    const rule = await as(args[0], (s) => editRule(s, args[1], args[2]));
-    console.log(rule ? 'Changed. What it said before is kept in its history.' : 'There is no rule with that id that you can change.');
+    await as(args[0], async (s) => {
+      const rule = await editRule(s, args[1], args[2]);
+      if (!rule) return console.log('There is no rule with that id that you can change.');
+      console.log('Changed. What it said before is kept in its history.');
+      if (!rule.privateTo && rule.reachesDown) console.log(reach(await spaceById(s, rule.spaceId)));
+    });
   } else if (command === 'remove-rule' && args.length === 2) {
     const removed = await as(args[0], (s) => removeRule(s, args[1]));
     console.log(removed ? 'Removed. It stays in the history.' : 'There is no rule with that id that you can change.');
@@ -79,6 +77,20 @@ try {
   process.exitCode = 1;
 } finally {
   await sql.end();
+}
+
+async function spaceById(s: Parameters<typeof listSpaces>[0], spaceId: string): Promise<Space> {
+  const space = (await listSpaces(s)).find((candidate) => candidate.id === spaceId);
+  if (!space) throw new Error('There is no space with that id that you can see.');
+  return space;
+}
+
+/** Shown whenever someone changes shared guidance (spec §2). */
+function reach(space: Space): string {
+  return (
+    `It also applies to the spaces below ${space.name}, including closed ones you can't access, ` +
+    'and their members may receive it.'
+  );
 }
 
 function printRules(rules: Rule[]) {

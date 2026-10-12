@@ -318,6 +318,7 @@ async function remember(
     if (!item || item.spaceId !== spaceId) {
       throw new Refused('There is no item with that reference in this space that you can see.');
     }
+    if (item.kind !== 'text') throw new Refused(onlyPeople);
     if (input.updates) {
       if (item.privateTo !== personOf(s.principal)) {
         throw new Refused("remember can't rewrite shared knowledge. Use replaces to update it in your own view.");
@@ -325,10 +326,11 @@ async function remember(
       await updateItem(s, itemId, { body: input.text, sources });
       return `Updated ${ref('item', itemId)}. What it said before is kept in its history.`;
     }
-    const replacement = await supersedeItem(s, itemId, { body: input.text, sources });
+    // Knowledge never reaches down, so what remember can read here, it can change.
+    const replacement = (await supersedeItem(s, itemId, { body: input.text, sources }))!;
     return item.privateTo === null
-      ? `Saved as ${ref('item', replacement!.id)} on your private side. For you it replaces ${ref('item', itemId)}, and others in the space still see the earlier version.`
-      : `Saved as ${ref('item', replacement!.id)}. ${ref('item', itemId)} is kept as what used to be true.`;
+      ? `Saved as ${ref('item', replacement.id)} on your private side. For you it replaces ${ref('item', itemId)}, and others in the space still see the earlier version.`
+      : `Saved as ${ref('item', replacement.id)}. ${ref('item', itemId)} is kept as what used to be true.`;
   }
 
   const page = await pageFor(s, spaceId, input.page, input.type);

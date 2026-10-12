@@ -25,7 +25,7 @@ import {
   type Item,
   type Source,
 } from '../src/knowledge.ts';
-import { addMember, createSpace, listSpaces } from '../src/spaces.ts';
+import { addMember, createSpace, listSpaces, peopleNames } from '../src/spaces.ts';
 import { admin, as, db, person, refused, type Person } from './helpers.ts';
 
 interface Client {
@@ -83,6 +83,7 @@ for (const [layer, sql] of [
           }
           for (const page of target.pages) assert.equal(await readPage(s, page), undefined);
           for (const item of target.items) assert.equal(await readItem(s, item.id), undefined);
+          assert.equal((await peopleNames(s, [target.person.id])).size, 0);
         }, sql);
       }
     });
