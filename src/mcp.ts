@@ -89,7 +89,12 @@ export function mcpServer(sql: Sql, principal: AgentPrincipal): McpServer {
         'Use replaces when something is no longer true, and updates to correct something you saved.',
       inputSchema: z.object({
         space: text().describe('The space it belongs to, such as space:…'),
-        text: text().optional().describe('The knowledge, in Markdown'),
+        text: text()
+          .optional()
+          .describe(
+            'The knowledge, in Markdown, written so it still reads true later. ' +
+              "Leave out remarks about this conversation, such as what you searched for or couldn't find.",
+          ),
         page: text().optional().describe('The title of the page for its subject, or a page reference'),
         type: text().optional().describe('The type of a new page, such as person, project or decision'),
         replaces: text().optional().describe('An item that is no longer true because of this'),
