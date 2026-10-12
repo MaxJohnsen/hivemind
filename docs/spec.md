@@ -304,6 +304,7 @@ The line between `remember` and `act` is where a change happens and whom it affe
 More about the tools:
 
 - `remember` needs no approval, but it still has permissions. It can't overwrite text people wrote, change guidance, or write to anyone else's private side.
+- `remember` puts knowledge on the page for its subject: an existing page when there is one, a new one when the subject deserves it, and otherwise the space's notes, which upkeep can reorganize later. Sources can be kept on their own as evidence. An agent's own words are never treated as a source.
 - `act` returns one of three outcomes: done, waiting for approval (with a form or a link), or blocked. Approval is never a tool.
 - Every write can, and should, cite its sources.
 - A new system adds actions to `act`, never new tools. `act` validates arguments, authorization and approvals.
@@ -312,7 +313,7 @@ More about the tools:
 
 **Clients.**
 
-- There are three levels of integration: MCP only, which works whenever the client calls the tools; MCP plus one recommended instruction, which is more consistent; and native integration, where context loads reliably and sessions are captured through hooks.
+- There are three levels of integration: MCP only, which works whenever the client calls the tools; MCP plus one recommended instruction, which is more consistent; and native integration, where context loads reliably and sessions are captured through hooks. The recommended instruction is part of Hivemind's MCP instructions, so clients that show those follow it without setup.
 - With native integration, Hivemind learns from conversations automatically unless you say "don't keep this". Otherwise it learns through `remember`. It keeps the knowledge, not the transcript, and background learning never depends on the chat client.
 - Space detection is a suggestion that asks when unsure. Git remotes are hints. There is no hidden "current space".
 - Hivemind requires no repository structure, local workspace or separate chat app. Prompts and MCP Apps are enhancements.

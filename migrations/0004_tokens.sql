@@ -7,7 +7,7 @@ create table tokens (
   id uuid primary key default gen_random_uuid(),
   person_id uuid not null references people (id) on delete cascade,
   -- The agent that uses it. Its writes are recorded under this name.
-  agent text not null,
+  agent text not null check (agent <> ''),
   hash bytea not null unique,
   created_at timestamptz not null default now()
 );
@@ -26,10 +26,18 @@ begin
 end
 $$;
 
+-- Revokes all of the current person's tokens.
+create function revoke_tokens() returns integer
+language sql security definer set search_path = public, pg_temp
+as $$
+  with revoked as (delete from tokens where person_id = current_person_id() returning 1)
+  select count(*)::integer from revoked
+$$;
+
 -- The person a token acts for, and the agent using it.
 create function authenticate(hash bytea, out person_id uuid, out agent text)
 language sql stable security definer set search_path = public, pg_temp
 as $$ select t.person_id, t.agent from tokens t where t.hash = authenticate.hash $$;
 
-revoke execute on function create_token, authenticate from public;
-grant execute on function create_token, authenticate to hivemind_app;
+revoke execute on function create_token, revoke_tokens, authenticate from public;
+grant execute on function create_token, revoke_tokens, authenticate to hivemind_app;

@@ -65,7 +65,7 @@ Each routine run is a job, recording who it acted for, which connection it used,
 
 Self-hosting is part of the product, not something users piece together: HTTPS, MCP authentication, OAuth callbacks, migrations, upgrades, backup and restore. A full backup includes the encryption key. A Markdown export is not an operational backup.
 
-Hivemind applies its migrations when it starts. Local agents such as Claude Code connect with a personal token, of which Hivemind keeps only a hash. Claude.ai and ChatGPT need OAuth, which comes later.
+Migrations run as a separate step before the server starts, so the running server never holds the admin role. Local agents such as Claude Code connect with a personal token, of which Hivemind keeps only a hash, and a person can revoke their tokens. Claude.ai and ChatGPT need OAuth, which comes later.
 
 ## Toward a hosted version
 

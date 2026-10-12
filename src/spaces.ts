@@ -1,4 +1,4 @@
-import type { Session, Sql } from './db.ts';
+import { personOf, type Session, type Sql } from './db.ts';
 
 export type Role = 'admin' | 'member';
 
@@ -48,7 +48,7 @@ export async function removeMember(s: Session, spaceId: string, personId: string
 }
 
 export async function listSpaces(s: Session): Promise<Space[]> {
-  const person = 'person' in s.principal ? s.principal.person : null;
+  const person = personOf(s.principal) ?? null;
   return s.tx<Space[]>`
     select s.id, s.name, s.parent_id, s.closed, s.private_to, coalesce(a.admin, false) as admin
     from spaces s
@@ -58,11 +58,12 @@ export async function listSpaces(s: Session): Promise<Space[]> {
   `;
 }
 
-/** The name of the person the session acts for. */
-export async function personName(s: Session): Promise<string | undefined> {
-  if (!('person' in s.principal)) return undefined;
-  const [person] = await s.tx`select name from people where id = ${s.principal.person}::uuid`;
-  return person?.name;
+/** The names of the people with these ids, as far as the session can see them. */
+export async function peopleNames(s: Session, ids: (string | null)[]): Promise<Map<string, string>> {
+  const known = [...new Set(ids.filter((id) => id !== null))];
+  if (known.length === 0) return new Map();
+  const people = await s.tx<{ id: string; name: string }[]>`select id, name from people where id in ${s.tx(known)}`;
+  return new Map(people.map((person) => [person.id, person.name]));
 }
 
 /**
