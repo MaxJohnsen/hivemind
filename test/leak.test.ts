@@ -1,16 +1,28 @@
 // The leak test, for guarantee 2: nothing crosses between clients.
 //
-// Ana works for Acme and Ben for Beta. Each has knowledge on their client's
-// shared side, private notes there, and notes in their personal space. Each
-// tries to read and change the other's, in three ways: through Hivemind,
-// through Hivemind with row-level security off, and straight against the
-// database with Hivemind's filters bypassed. So each layer is shown to
-// refuse on its own.
+// Ana works for Acme and Ben for Beta. Each has a page of knowledge on their
+// client's shared side, a private note on it that cites an email and has an
+// earlier version, and notes in their personal space. Each tries to read and
+// change the other's, in three ways: through Hivemind, through Hivemind with
+// row-level security off, and straight against the database with Hivemind's
+// filters bypassed. So each layer is shown to refuse on its own.
 
 import assert from 'node:assert/strict';
 import { before, describe, test } from 'node:test';
-import { listItems, readItem, updateItem, writeItem, type Item } from '../src/content.ts';
 import { AccessDenied } from '../src/db.ts';
+import {
+  addSource,
+  createPage,
+  listPages,
+  readItem,
+  readPage,
+  search,
+  supersedeItem,
+  updateItem,
+  writeItem,
+  type Item,
+  type Source,
+} from '../src/knowledge.ts';
 import { addMember, createSpace, listSpaces } from '../src/spaces.ts';
 import { admin, as, db, person, refused, type Person } from './helpers.ts';
 
@@ -18,7 +30,9 @@ interface Client {
   name: string;
   person: Person;
   space: string;
+  pages: string[];
   items: Item[];
+  source: Source;
 }
 
 let acme: Client;
@@ -27,12 +41,16 @@ let beta: Client;
 before(async () => {
   acme = await client('Acme', 'Ana', {
     shared: 'Acme launches on 1 March',
+    draft: 'Ana thinks the launch is on track',
     private: 'Ana thinks the launch will slip',
+    email: 'Gunnar says the launch date is not final',
     personal: 'Ana has a dentist appointment on Friday',
   });
   beta = await client('Beta', 'Ben', {
     shared: 'Beta’s budget is approved',
+    draft: 'Ben expects the budget to hold',
     private: 'Ben expects budget cuts in May',
+    email: 'Finance wants to revisit the budget',
     personal: 'Ben picks up the kids on Thursdays',
   });
 });
@@ -48,31 +66,52 @@ for (const [layer, sql] of [
   ['through Hivemind, with row-level security off', admin],
 ] as const) {
   describe(layer, () => {
-    test('nobody sees another client’s spaces or items', async () => {
+    test('nobody sees another client’s spaces, pages or items', async () => {
       for (const { intruder, target } of attempts()) {
         await as(intruder.person, async (s) => {
           const spaces = await listSpaces(s);
           assert.ok(!spaces.some((space) => space.id === target.space));
-          assert.deepEqual(bodies(await listItems(s, target.space)), []);
-          assert.deepEqual(bodies(await listItems(s, target.person.personalSpaceId)), []);
+          for (const space of [target.space, target.person.personalSpaceId]) {
+            assert.equal((await listPages(s, space)).length, 0);
+          }
+          for (const page of target.pages) assert.equal(await readPage(s, page), undefined);
           for (const item of target.items) assert.equal(await readItem(s, item.id), undefined);
         }, sql);
       }
     });
 
+    test('nobody finds another client’s knowledge in search', async () => {
+      for (const { intruder, target } of attempts()) {
+        const own = [intruder.space, intruder.person.personalSpaceId];
+        for (const text of [...bodies(target.items), target.source.excerpt]) {
+          const hits = await as(intruder.person, (s) => search(s, text), sql);
+          assert.deepEqual(hits.filter((hit) => !own.includes(hit.spaceId)), []);
+        }
+      }
+    });
+
     test('nobody writes to another client’s space', async () => {
       for (const { intruder, target } of attempts()) {
-        const write = (shared: boolean) =>
-          as(intruder.person, (s) => writeItem(s, { spaceId: target.space, body: 'Hello', shared }), sql);
-        await assert.rejects(write(true), AccessDenied);
-        await assert.rejects(write(false), AccessDenied);
+        const me = intruder.person;
+        const [page] = target.pages;
+        for (const shared of [true, false]) {
+          await assert.rejects(as(me, (s) => writeItem(s, { pageId: page, body: 'Hello', shared }), sql), AccessDenied);
+          await assert.rejects(as(me, (s) => createPage(s, { spaceId: target.space, title: 'Hello', shared }), sql), AccessDenied);
+          await assert.rejects(as(me, (s) => addSource(s, { spaceId: target.space, excerpt: 'Hello', shared }), sql), AccessDenied);
+        }
+        // Not even by citing the other client's source in their own notes.
+        await assert.rejects(
+          as(me, (s) => writeItem(s, { pageId: intruder.pages[0], body: 'Hello', sources: [target.source.id] }), sql),
+          AccessDenied,
+        );
       }
     });
 
     test('nobody changes another client’s items', async () => {
       for (const { intruder, target } of attempts()) {
         for (const item of target.items) {
-          assert.equal(await as(intruder.person, (s) => updateItem(s, item.id, 'Changed'), sql), undefined);
+          assert.equal(await as(intruder.person, (s) => updateItem(s, item.id, { body: 'Changed' }), sql), undefined);
+          assert.equal(await as(intruder.person, (s) => supersedeItem(s, item.id, { body: 'Changed' }), sql), undefined);
         }
       }
       await assertUntouched();
@@ -90,15 +129,25 @@ for (const [layer, sql] of [
 
 describe('straight against the database', () => {
   test('each person reads only their own client’s rows', async () => {
-    for (const { name, person, items } of [acme, beta]) {
+    for (const { name, person, items, source } of [acme, beta]) {
       await as(person, async (s) => {
-        const content = await s.tx`select body from content order by created_at`;
+        const texts = await s.tx`select body from content where kind = 'text' order by created_at`;
+        const titles = await s.tx`select body from content where kind = 'title' order by created_at`;
+        const sources = await s.tx`select excerpt from sources`;
+        const history = await s.tx`select body from revisions`;
+        const citations = await s.tx`select source_id from citations`;
+        const pages = await s.tx`select id from pages`;
         const spaces = await s.tx`select name from spaces order by created_at`;
         const people = await s.tx`select name from people`;
         const members = await s.tx`select distinct person_id from memberships`;
         const access = await s.tx`select distinct person_id from space_access`;
 
-        assert.deepEqual(content.map((row) => row.body), bodies(items));
+        assert.deepEqual(texts.map((row) => row.body), bodies(items));
+        assert.deepEqual(titles.map((row) => row.body), [`${name} plans`, 'Notes']);
+        assert.deepEqual(sources.map((row) => row.excerpt), [source.excerpt]);
+        assert.equal(history.length, 1);
+        assert.deepEqual(citations.map((row) => row.sourceId), [source.id]);
+        assert.equal(pages.length, 2);
         assert.deepEqual(spaces.map((row) => row.name), ['Personal', name]);
         assert.deepEqual(people.map((row) => row.name), [person.name]);
         assert.deepEqual(members.map((row) => row.personId), [person.id]);
@@ -109,13 +158,40 @@ describe('straight against the database', () => {
 
   test('nobody writes to another client’s space', async () => {
     for (const { intruder, target } of attempts()) {
+      const me = intruder.person;
+      const [page] = target.pages;
       const insert = (privateTo: string | null) =>
-        as(intruder.person, (s) => s.tx`
-          insert into content (space_id, private_to, body) values (${target.space}, ${privateTo}, 'Hello')
+        as(me, (s) => s.tx`
+          insert into content (space_id, page_id, private_to, written_by, body)
+          values (${target.space}, ${page}, ${privateTo}, ${me.id}, 'Hello')
         `);
       await assert.rejects(insert(null), refused); // the shared side
-      await assert.rejects(insert(intruder.person.id), refused); // a private side of their own
+      await assert.rejects(insert(me.id), refused); // a private side of their own
       await assert.rejects(insert(target.person.id), refused); // the other person's private side
+
+      await assert.rejects(as(me, (s) => s.tx`
+        insert into sources (space_id, private_to, written_by, excerpt) values (${target.space}, ${me.id}, ${me.id}, 'Hello')
+      `), refused);
+      await assert.rejects(as(me, (s) => s.tx`
+        insert into pages (space_id) values (${target.space})
+      `), refused);
+      await assert.rejects(as(me, (s) => s.tx`
+        insert into citations (content_id, source_id) values (${intruder.items[1].id}, ${target.source.id})
+      `), refused);
+    }
+  });
+
+  test('nobody writes in someone else’s name', async () => {
+    for (const { intruder, target } of attempts()) {
+      const me = intruder.person;
+      await assert.rejects(as(me, (s) => s.tx`
+        insert into content (space_id, page_id, private_to, written_by, body)
+        values (${intruder.space}, ${intruder.pages[0]}, ${me.id}, ${target.person.id}, 'Hello')
+      `), refused);
+      await assert.rejects(as(me, (s) => s.tx`
+        insert into sources (space_id, private_to, written_by, excerpt)
+        values (${intruder.space}, ${me.id}, ${target.person.id}, 'Hello')
+      `), refused);
     }
   });
 
@@ -171,17 +247,19 @@ describe('straight against the database', () => {
 async function client(
   name: string,
   personName: string,
-  notes: { shared: string; private: string; personal: string },
+  notes: { shared: string; draft: string; private: string; email: string; personal: string },
 ): Promise<Client> {
   const p = await person(personName);
   return as(p, async (s) => {
     const space = await createSpace(s, { name });
-    const items = [
-      await writeItem(s, { spaceId: space, body: notes.shared, shared: true }),
-      await writeItem(s, { spaceId: space, body: notes.private }),
-      await writeItem(s, { spaceId: p.personalSpaceId, body: notes.personal }),
-    ];
-    return { name, person: p, space, items };
+    const page = await createPage(s, { spaceId: space, title: `${name} plans`, shared: true });
+    const source = await addSource(s, { spaceId: space, reference: 'An email', excerpt: notes.email });
+    const shared = await writeItem(s, { pageId: page, body: notes.shared, shared: true });
+    const draft = await writeItem(s, { pageId: page, body: notes.draft, sources: [source.id] });
+    const changed = await updateItem(s, draft.id, { body: notes.private });
+    const personalPage = await createPage(s, { spaceId: p.personalSpaceId, title: 'Notes' });
+    const personal = await writeItem(s, { pageId: personalPage, body: notes.personal });
+    return { name, person: p, space, pages: [page, personalPage], items: [shared, changed!, personal], source };
   });
 }
 
@@ -189,7 +267,9 @@ async function client(
 async function assertUntouched() {
   for (const { items } of [acme, beta]) {
     const stored = await admin`
-      select body from content where id in ${admin(items.map((item) => item.id))} order by created_at
+      select body from content
+      where id in ${admin(items.map((item) => item.id))} and superseded_by is null
+      order by created_at
     `;
     assert.deepEqual(stored.map((row) => row.body), bodies(items));
   }
