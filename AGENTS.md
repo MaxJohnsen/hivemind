@@ -4,7 +4,7 @@ Guidance for AI agents working in this repository.
 
 ## What this repository is
 
-Hivemind is being designed, so for now the documents are the product. Each one has a job:
+Hivemind is being designed and built in the open. The documents describe it, and each one has a job:
 
 - `README.md` makes people interested. It starts with the problem.
 - `docs/concept.md` explains the idea in plain language, without technology.
@@ -32,7 +32,8 @@ This repository should read as if people wrote it for people.
 - Build the simplest implementation that satisfies the spec. Don't build complexity the spec only anticipates.
 - Work one issue at a time, in small pull requests. Each issue says what someone can do when it is done.
 - Each pull request says what changed, why, and how it was tested.
-- The cross-client leak test (guarantee 2) runs on every change.
+- The cross-client leak test (guarantee 2) runs on every change. `npm run check` and `npm test` must pass; the tests need the database from `docker compose up -d`.
+- A new table holding space data carries `space_id` and `private_to`, gets row-level security, and is added to the leak test.
 - Agree on UI design, component library and guidelines with the maintainer before building any screen people use.
 - The plan can change. If using Hivemind shows a better order, adapt.
 

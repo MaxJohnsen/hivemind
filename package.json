@@ -1,0 +1,21 @@
+{
+  "name": "hivemind",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "migrate": "node src/migrate.ts",
+    "check": "tsc",
+    "test": "node test/reset.ts && node --test 'test/**/*.test.ts'"
+  },
+  "dependencies": {
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2"
+  }
+}

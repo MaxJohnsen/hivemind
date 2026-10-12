@@ -24,6 +24,7 @@ Chosen for fast context retrieval, simple self-hosting, reliable concurrency and
 |---|---|
 | Language | TypeScript on Node.js, for the MCP server, web app, workers and adapters |
 | Database | PostgreSQL, the single source of truth |
+| Database access | Plain SQL through postgres.js, with SQL migration files |
 | Search | Postgres full-text search plus `pg_trgm` for names; pgvector only when semantic search is enabled |
 | Queue | Postgres (`SKIP LOCKED`) |
 | Space tree | Plain tables with recursive queries |
@@ -55,7 +56,7 @@ Each routine run is a job, recording who it acted for, which connection it used,
 
 - It uses the same access table and content visibility as the application, including the exceptions for guidance and proposals.
 - One restricted database role handles normal operations. Each request or routine sets its person or space for the transaction, and background workers get no elevated access.
-- A separate admin role is used only for migrations and narrowly defined housekeeping, such as deletion cascades and access-table updates. The normal role can't write the access table.
+- A separate admin role is used only for migrations and narrowly defined housekeeping, such as deletion cascades and access-table updates. The normal role can't write the access table, and changes spaces and memberships only through database functions that check the caller's rights.
 - It covers sensitive data: content, sources, credentials and search data. Purely technical tables don't need the same policies.
 - The application still filters explicitly. Row-level security catches missing filters. It is not protection against a fully compromised application.
 
@@ -69,5 +70,5 @@ Hivemind is designed so it could run as a managed service, without building that
 
 ## Open
 
-- Web framework and database query library.
+- Web framework.
 - A built-in OAuth authorization server, or a delegated identity provider.
