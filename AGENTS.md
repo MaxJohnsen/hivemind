@@ -37,6 +37,19 @@ This repository should read as if people wrote it for people.
 - Agree on UI design, component library and guidelines with the maintainer before building any screen people use.
 - The plan can change. If using Hivemind shows a better order, adapt.
 
+## How we test
+
+Tests show that Hivemind keeps its promises. A good test reads like a short story from the spec and fails only when something that matters breaks.
+
+- Test behavior through Hivemind's own operations, against a real database. Don't mock Hivemind's code; fake only outside systems, at the edge.
+- Most tests are integration tests like that. Each issue's "Done when" becomes one end-to-end test through the real interface, such as an MCP client. Unit tests are for pure logic with many cases.
+- Name a test after the behavior it proves: "removing a member takes effect immediately".
+- Use one small cast and realistic data, so a leak would be obvious: Ana works for Acme, Ben for Beta, and Cara is Ana's colleague.
+- Each test creates its own people, so tests don't depend on each other or on order.
+- A protection counts as tested only if breaking it makes a test fail. For anything that guards access, break it once and watch the test fail.
+- Fix a bug by first writing the test that shows it.
+- Don't test what the type checker, the database or a library already guarantees, and don't write tests to raise coverage.
+
 ## Changing the design
 
 - The concept is deliberately stable. Add a concept only when implementation shows a real limitation.

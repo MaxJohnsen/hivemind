@@ -6,19 +6,26 @@ import { inTestDatabase } from './reset.ts';
 /** Hivemind's connection, as the restricted role. */
 export const db = connect(inTestDatabase(databaseUrl));
 
-/** The admin role, for changes Hivemind has no operation for yet. */
+/** The admin role, which row-level security doesn't apply to. */
 export const admin = connect(inTestDatabase(adminUrl));
 
 after(() => Promise.all([db.end(), admin.end()]));
 
-export function as<T>(principal: Principal, fn: (s: Session) => Promise<T>): Promise<T> {
-  return withPrincipal(db, principal, fn);
+/** Runs fn as a person or a space, the way Hivemind does. */
+export function as<T>(principal: Principal, fn: (s: Session) => Promise<T>, sql = db): Promise<T> {
+  return withPrincipal(sql, principal, fn);
 }
 
-/** Creates a person. Each test makes its own, so tests can't see each other's data. */
+/**
+ * Creates a person, who can also act as a principal. Every test creates its
+ * own people, so tests never see each other's data.
+ */
 export async function person(name: string) {
-  const created = await createPerson(db, name);
-  return { ...created, principal: { person: created.id } };
+  const { id, personalSpaceId } = await createPerson(db, name);
+  return { name, id, personalSpaceId, person: id };
 }
 
-export const ids = (rows: readonly { id: string }[]) => rows.map((row) => row.id).sort();
+export type Person = Awaited<ReturnType<typeof person>>;
+
+/** How PostgreSQL refuses an operation: insufficient privilege. */
+export const refused = { code: '42501' };
