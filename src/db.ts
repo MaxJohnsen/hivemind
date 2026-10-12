@@ -4,9 +4,11 @@ export type Sql = postgres.Sql;
 
 /**
  * Who a request or routine acts for. Every transaction runs as exactly one.
- * The agent, if any, is what acts for them, such as "Claude Code".
+ * The agent, if any, is what acts for them, such as "Claude Code". A person
+ * editing directly, as in the web app or the command line, is marked direct:
+ * only then can they change guidance.
  */
-export type Principal = ({ person: string } | { space: string }) & { agent?: string };
+export type Principal = ({ person: string; direct?: true } | { space: string }) & { agent?: string };
 
 /** A transaction running as a principal. */
 export interface Session {
@@ -38,11 +40,13 @@ export async function withPrincipal<T>(
 ): Promise<T> {
   const person = 'person' in principal ? principal.person : '';
   const space = 'space' in principal ? principal.space : '';
+  const direct = 'person' in principal && principal.direct ? 'true' : '';
   return (await sql.begin(async (tx) => {
     await tx`
       select set_config('hivemind.person_id', ${person}, true),
              set_config('hivemind.space_id', ${space}, true),
-             set_config('hivemind.agent', ${principal.agent ?? ''}, true)
+             set_config('hivemind.agent', ${principal.agent ?? ''}, true),
+             set_config('hivemind.direct', ${direct}, true)
     `;
     return fn({ tx, principal });
   })) as T;

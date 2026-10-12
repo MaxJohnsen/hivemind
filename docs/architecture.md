@@ -56,6 +56,7 @@ Each routine run is a job, recording who it acted for, which connection it used,
 **Row-level security is on from day one.** Hivemind decides what actions are authorized. PostgreSQL independently enforces who can access protected data. Normal requests and routines never bypass that protection.
 
 - It uses the same access table and content visibility as the application, including the exceptions for guidance and proposals.
+- Each guidance item records whether it reaches down, and a read-only policy lets shared guidance through to the spaces below, closed ones included. Private guidance needs no exception, since its owner can open its space. A trigger checks every write to a guidance page: it must be a person editing directly, shared guidance needs an admin, and the page holds only rules. Only the web app and the command line mark an edit as direct, so a new path can't change guidance by accident.
 - One restricted database role handles normal operations. Each request or routine sets its person or space for the transaction, and background workers get no elevated access.
 - A separate admin role is used only for migrations and narrowly defined housekeeping, such as deletion cascades and access-table updates. The normal role can't write the access table, and changes spaces and memberships only through database functions that check the caller's rights.
 - It covers sensitive data: content, sources, credentials and search data. Purely technical tables don't need the same policies.
@@ -66,6 +67,8 @@ Each routine run is a job, recording who it acted for, which connection it used,
 Self-hosting is part of the product, not something users piece together: HTTPS, MCP authentication, OAuth callbacks, migrations, upgrades, backup and restore. A full backup includes the encryption key. A Markdown export is not an operational backup.
 
 Migrations run as a separate step before the server starts, so the running server never holds the admin role. Local agents such as Claude Code connect with a personal token, of which Hivemind keeps only a hash, and a person can revoke their tokens. Claude.ai and ChatGPT need OAuth, which comes later.
+
+Until there is sign-in and a web app, a command-line tool sets up people, spaces and tokens, and edits guidance. It is a stand-in, not the intended way to use Hivemind.
 
 ## Toward a hosted version
 

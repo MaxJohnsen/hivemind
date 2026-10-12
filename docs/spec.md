@@ -65,22 +65,24 @@ Guidance is rules and skills. It applies down the tree, the more specific rule w
 - A **guidance page.** One per space, with one item per rule. A rule is a requirement or a preference, and can be marked *only here*. It exports as AGENTS.md.
 - A **skill page.** Instructions plus files such as references and scripts. It exports as a SKILL.md folder and can be served as `skill://` resources.
 
-Rules that apply are evaluated for precedence, and applicable requirements always load. Skills are picked by relevance.
+Hivemind picks the rules that apply and puts them in order, and requirements always load. Skills are picked by relevance.
 
 **How it flows.**
 
 - Guidance applies to its space and everything below it, unless it is marked *only here*.
-- It reaches everyone in a child space, including people who can't access the parent. A closed space blocks inherited membership, not guidance.
+- It reaches everyone in a child space, including people who can't access the parent. A closed space blocks inherited membership, not guidance. When you edit shared guidance, Hivemind tells you it also applies to child spaces, including closed ones you can't access, and that *only here* prevents it. It reveals nothing about those spaces.
 - Your personal space's own guidance follows you everywhere. Spaces under your personal space behave like any other.
 - An include pulls in other guidance by link. It expands only for readers who can access what it points to, and never grants access.
 
 **Precedence.**
 
-- The more specific rule wins. Between equally specific rules, the private one wins. Personal-space guidance counts as the least specific.
-- Requirements always apply. If two conflict, only the affected action is blocked, and both rule owners are told.
-- Obvious conflicts are caught when a rule is saved, the rest when guidance is evaluated.
+- Hivemind picks the rules that apply and orders them from least to most specific, with requirements marked. Personal-space guidance counts as the least specific.
+- The more specific preference wins, and between equally specific preferences the private one wins. A preference never wins over a requirement.
+- Hivemind doesn't judge whether two rules contradict each other, because that means interpreting their text. The agent does, and Hivemind can't guarantee it notices every contradiction.
+- If two requirements conflict, the agent stops the affected action, tells the user which rules conflict, and can propose a fix.
+- When someone adds a rule, they see the rules that already apply there.
 
-**Only people change guidance.** Agents act in your name through MCP, so your identity alone doesn't prove that *you* decided. Every write to a guidance or skill page, including its files and settings, passes one check in the store: it must be a direct edit by an authorized person in the web app, or an approved proposal (§6). That covers imports, MCP, background workers and any path added later. When you ask an agent to add a rule, you confirm the exact text.
+**Only people change guidance.** Agents act in your name through MCP, so your identity alone doesn't prove that *you* decided. Every write to a guidance or skill page, including its files and settings, passes one check in the store: it must be a direct edit by an authorized person, or an approved proposal (§6). That covers imports, MCP, background workers and any path added later. When you ask an agent to add a rule, you confirm the exact text.
 
 Shared guidance is changed by the space's admins, and other members can propose changes. Private guidance is changed by its owner.
 
@@ -197,13 +199,15 @@ An authorized person can create either one directly in the web app. When an agen
 
 Whenever Hivemind needs a person to decide, it creates a proposal: an exact change, waiting for the authorization it needs.
 
+Hivemind is designed to be used through ordinary AI conversations, and everything can be started from any MCP client. Agents save and organize knowledge on their own. Changes to guidance, sharing and access are decided by people: you confirm the exact change in the conversation when the client can support that securely, and otherwise on a small confirmation page.
+
 One concept covers guidance changes, sharing suggestions, publishing approvals, updates to published knowledge, and the catch-up when a space becomes collaborative. A proposal holds the change, why it was made (a correction, new evidence, an agent), its deciders and its state (open, approved, rejected or expired).
 
 - **Approving runs exactly what was shown.** If the underlying thing changes first, the proposal is shown again.
 - **Approval never grants permissions the approver doesn't have.** Every boundary a change crosses needs its own authorization, possibly from different people. Publishing your private knowledge to Acme needs your consent to disclose it and someone's right to publish in Acme. The owner approves disclosure first, so nobody else sees private content before its owner has agreed.
 - **Only the proposer and the deciders can see a proposal.**
 - **Direct edits skip proposals.** An authorized person editing in the web app simply saves. Both paths use the same checks and the same history.
-- **An approval only counts through a channel the agent can't speak for:** the web app, a form shown by the client (MCP elicitation), or a link you open. An agent saying "the user approved" is never an approval.
+- **An approval only counts through a channel the agent can't speak for.** An agent saying "the user approved" is never an approval.
 
 **Approvals are the exception, not the routine.** They appear where you work: in chat when possible, otherwise in an inbox and a daily digest. Each one shows what, to whom and where it came from. They are grouped by destination, and single items can be excluded. If nobody answers, knowledge stays private, important items surface in context, and actions never run. Approval fatigue is tracked as a metric.
 

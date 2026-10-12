@@ -126,6 +126,20 @@ test('a replacement stays on its page, on a side that can see what it replaces',
   await assert.rejects(replace(page, draft.id, null), refused);
   // An item on another page.
   await assert.rejects(replace(otherPage, decision.id, cara.id), { code: '23503' });
+  // The page's title, which isn't knowledge.
+  const [title] = await as(cara, (s) => s.tx`select id from content where page_id = ${page} and kind = 'title'`);
+  await assert.rejects(replace(page, title.id, cara.id), refused);
+});
+
+test('knowledge is replaced, never removed', async () => {
+  const { cara, space, page, decision } = await acme();
+  await assert.rejects(
+    as(cara, (s) => s.tx`
+      insert into content (space_id, page_id, kind, body, supersedes)
+      values (${space}, ${page}, 'removed', '', ${decision.id})
+    `),
+    { code: '23514' },
+  );
 });
 
 test('only the writer of an item adds sources to it', async () => {
@@ -146,9 +160,9 @@ test('a page has one title on each side', async () => {
   );
 });
 
-test('guidance and skill pages are reserved', async () => {
+test('knowledge can’t pose as guidance', async () => {
   const { ana, space } = await acme();
-  for (const type of ['guidance', 'Skill']) {
+  for (const type of ['Guidance', 'skill']) {
     await assert.rejects(as(ana, (s) => createPage(s, { spaceId: space, title: 'Rules', type })), { code: '23514' });
   }
 });
