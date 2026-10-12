@@ -30,7 +30,7 @@ Chosen for fast context retrieval, simple self-hosting, reliable concurrency and
 | Space tree | Plain tables with recursive queries |
 | Credentials | Encrypted in Postgres; the key is kept outside the database |
 | Model access | A thin provider layer: Anthropic, OpenAI, or any OpenAI-compatible local endpoint |
-| Deployment | Docker Compose: one Hivemind image plus Postgres |
+| Deployment | Docker Compose: one Hivemind image plus Postgres. Each release publishes the image for amd64 and arm64 |
 
 - One image runs every component. A setting chooses its role (everything, MCP and web, or workers), so an installation can be split later without code changes. Heavy parsing runs in worker processes.
 - No Redis, search engine, vector database or graph database. One is added only if a benchmark shows Postgres falls short. For search, the fallback is a ranking extension inside Postgres, such as ParadeDB's `pg_search`, not a new service.
