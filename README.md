@@ -36,7 +36,7 @@ Later, a client moves a launch date. Hivemind learns about it on your private si
 
 ## Status
 
-Hivemind is being designed in the open. The concept and the specification are written. The implementation has not started.
+Hivemind is being designed and built in the open. The concept and the specification are written, and work on the first increment has begun: spaces, guidance and knowledge over MCP, with no AI model needed. Progress is tracked in the [milestone](https://github.com/MaxJohnsen/hivemind/milestone/1).
 
 ## Read more
 

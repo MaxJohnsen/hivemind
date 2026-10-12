@@ -27,9 +27,19 @@ This repository should read as if people wrote it for people.
 - Present conclusions, not the discussion that led to them.
 - Link any claim about another project to its source.
 
+## How we build
+
+- Build the simplest implementation that satisfies the spec. Don't build complexity the spec only anticipates.
+- Work one issue at a time, in small pull requests. Each issue says what someone can do when it is done.
+- Each pull request says what changed, why, and how it was tested.
+- The cross-client leak test (guarantee 2) runs on every change.
+- Agree on UI design, component library and guidelines with the maintainer before building any screen people use.
+- The plan can change. If using Hivemind shows a better order, adapt.
+
 ## Changing the design
 
 - The concept is deliberately stable. Add a concept only when implementation shows a real limitation.
 - Record decisions in the spec, keep the concept, spec and architecture consistent, and remove anything a new decision makes stale.
+- Change the documents only when behavior or a design decision changes, in the same pull request as the code.
 - `notes/` holds unpublished research. It is ignored by git, and its content never goes into `docs/` without being checked and rewritten.
 - Commits follow Conventional Commits: `type(scope): subject`.
