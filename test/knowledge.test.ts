@@ -144,15 +144,16 @@ test('knowledge without a page stays findable in its source', async () => {
 
 test('search matches words by how they start', async () => {
   const { claude, space } = await acme();
-  await as(claude, async (s) => {
+  const { page, item } = await as(claude, async (s) => {
     const page = await createPage(s, { spaceId: space, title: 'Launch' });
-    await writeItem(s, { pageId: page, body: 'Acme launches on 1 March' });
+    const item = await writeItem(s, { pageId: page, body: 'Acme launches on 1 March' });
+    return { page, item };
   });
 
   const hits = await as(claude, (s) => search(s, 'launch'));
-  assert.deepEqual(hits.map((hit) => [hit.kind, hit.text]), [
-    ['page', 'Launch'],
-    ['item', 'Acme launches on 1 March'],
+  assert.deepEqual(hits.map((hit) => [hit.kind, hit.id, hit.text]), [
+    ['page', page, 'Launch'],
+    ['item', item.id, 'Acme launches on 1 March'],
   ]);
 });
 

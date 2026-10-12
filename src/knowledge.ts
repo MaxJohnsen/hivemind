@@ -197,7 +197,7 @@ export async function search(
   return s.tx<Hit[]>`
     select kind, id, space_id, page_id, title, text, superseded from (
       select case c.kind when 'title' then 'page' else 'item' end as kind,
-             c.id, c.space_id, c.page_id, ${titleOf(s, s.tx`c.page_id`)} as title, c.body as text,
+             case c.kind when 'title' then c.page_id else c.id end as id, c.space_id, c.page_id, ${titleOf(s, s.tx`c.page_id`)} as title, c.body as text,
              c.superseded_by is not null as superseded,
              ts_rank(c.search, to_tsquery('simple', ${terms}), 1) as rank
       from content c
