@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { listItems, writeItem } from '../src/content.ts';
+import { addSource, createPage, readPage, updateItem, writeItem } from '../src/knowledge.ts';
 import { AccessDenied, type Principal } from '../src/db.ts';
 import { addMember, createSpace, listSpaces, removeMember } from '../src/spaces.ts';
 import { admin, as, db, person, refused } from './helpers.ts';
@@ -11,8 +11,10 @@ async function spacesSeenBy(principal: Principal) {
   return (await as(principal, listSpaces)).map((space) => space.name);
 }
 
-async function itemsSeenBy(principal: Principal, spaceId: string, sql = db) {
-  return (await as(principal, (s) => listItems(s, spaceId), sql)).map((item) => item.body);
+/** The text a person sees on a page, or nothing if they can't see it. */
+async function pageSeenBy(principal: Principal, pageId: string, sql = db) {
+  const page = await as(principal, (s) => readPage(s, pageId), sql);
+  return page?.items.map((item) => item.body) ?? [];
 }
 
 test('membership flows down to child spaces, except into closed ones', async () => {
@@ -36,20 +38,21 @@ test('membership flows down to child spaces, except into closed ones', async () 
 test('colleagues share the shared side, but not each other’s private side', async () => {
   const ana = await person('Ana');
   const cara = await person('Cara');
-  const acme = await as(ana, async (s) => {
+  const launch = await as(ana, async (s) => {
     const acme = await createSpace(s, { name: 'Acme' });
     await addMember(s, acme, cara.id);
-    await writeItem(s, { spaceId: acme, body: 'Acme launches on 1 March', shared: true });
-    await writeItem(s, { spaceId: acme, body: 'Ana thinks the launch will slip' });
-    return acme;
+    const launch = await createPage(s, { spaceId: acme, title: 'Launch', shared: true });
+    await writeItem(s, { pageId: launch, body: 'Acme launches on 1 March', shared: true });
+    await writeItem(s, { pageId: launch, body: 'Ana thinks the launch will slip' });
+    return launch;
   });
-  await as(cara, (s) => writeItem(s, { spaceId: acme, body: 'Cara is on leave in March' }));
+  await as(cara, (s) => writeItem(s, { pageId: launch, body: 'Cara is on leave in March' }));
 
-  assert.deepEqual(await itemsSeenBy(ana, acme), ['Acme launches on 1 March', 'Ana thinks the launch will slip']);
-  assert.deepEqual(await itemsSeenBy(cara, acme), ['Acme launches on 1 March', 'Cara is on leave in March']);
+  assert.deepEqual(await pageSeenBy(ana, launch), ['Acme launches on 1 March', 'Ana thinks the launch will slip']);
+  assert.deepEqual(await pageSeenBy(cara, launch), ['Acme launches on 1 March', 'Cara is on leave in March']);
 
   // Hivemind hides Ana's side on its own too, without row-level security.
-  assert.deepEqual(await itemsSeenBy(cara, acme, admin), ['Acme launches on 1 March', 'Cara is on leave in March']);
+  assert.deepEqual(await pageSeenBy(cara, launch, admin), ['Acme launches on 1 March', 'Cara is on leave in March']);
 });
 
 test('your personal tree is yours alone', async () => {
@@ -63,12 +66,19 @@ test('your personal tree is yours alone', async () => {
   await assert.rejects(as(ana, (s) => addMember(s, sideProject, ben.id)), refused);
 
   // It has no shared side, so making it collaborative later can't expose anything.
+  const ideas = await as(ana, (s) => createPage(s, { spaceId: sideProject, title: 'Ideas' }));
   await assert.rejects(
-    as(ana, (s) => writeItem(s, { spaceId: sideProject, body: 'An idea', shared: true })),
+    as(ana, (s) => createPage(s, { spaceId: sideProject, title: 'Plans', shared: true })),
     AccessDenied,
   );
   await assert.rejects(
-    as(ana, (s) => s.tx`insert into content (space_id, body) values (${sideProject}, 'An idea')`),
+    as(ana, (s) => writeItem(s, { pageId: ideas, body: 'An idea', shared: true })),
+    AccessDenied,
+  );
+  await assert.rejects(
+    as(ana, (s) => s.tx`
+      insert into content (space_id, page_id, body) values (${sideProject}, ${ideas}, 'An idea')
+    `),
     refused,
   );
 });
@@ -95,48 +105,52 @@ test('only admins create spaces under a space or change membership, but anyone c
 test('removing a member takes effect immediately, in child spaces too', async () => {
   const ana = await person('Ana');
   const ben = await person('Ben');
-  const { acme, website } = await as(ana, async (s) => {
+  const { acme, design } = await as(ana, async (s) => {
     const acme = await createSpace(s, { name: 'Acme' });
     const website = await createSpace(s, { name: 'Website', parentId: acme });
     await addMember(s, acme, ben.id);
-    await writeItem(s, { spaceId: website, body: 'The website uses the new logo', shared: true });
-    return { acme, website };
+    const design = await createPage(s, { spaceId: website, title: 'Design', shared: true });
+    await writeItem(s, { pageId: design, body: 'The website uses the new logo', shared: true });
+    return { acme, design };
   });
-  assert.deepEqual(await itemsSeenBy(ben, website), ['The website uses the new logo']);
+  assert.deepEqual(await pageSeenBy(ben, design), ['The website uses the new logo']);
 
   await as(ana, (s) => removeMember(s, acme, ben.id));
 
   assert.deepEqual(await spacesSeenBy(ben), ['Personal']);
-  assert.deepEqual(await itemsSeenBy(ben, website), []);
+  assert.deepEqual(await pageSeenBy(ben, design), []);
 });
 
 test('a space sees only its own shared side', async () => {
   const ana = await person('Ana');
-  const { acme, website } = await as(ana, async (s) => {
+  const { acme, launch, design } = await as(ana, async (s) => {
     const acme = await createSpace(s, { name: 'Acme' });
     const website = await createSpace(s, { name: 'Website', parentId: acme });
-    await writeItem(s, { spaceId: acme, body: 'Acme launches on 1 March', shared: true });
-    await writeItem(s, { spaceId: acme, body: 'Ana thinks the launch will slip' });
-    await writeItem(s, { spaceId: website, body: 'The website uses the new logo', shared: true });
-    return { acme, website };
+    const launch = await createPage(s, { spaceId: acme, title: 'Launch', shared: true });
+    await writeItem(s, { pageId: launch, body: 'Acme launches on 1 March', shared: true });
+    await writeItem(s, { pageId: launch, body: 'Ana thinks the launch will slip' });
+    const design = await createPage(s, { spaceId: website, title: 'Design', shared: true });
+    await writeItem(s, { pageId: design, body: 'The website uses the new logo', shared: true });
+    return { acme, launch, design };
   });
 
   assert.deepEqual(await spacesSeenBy({ space: acme }), ['Acme']);
-  assert.deepEqual(await itemsSeenBy({ space: acme }, acme), ['Acme launches on 1 March']);
-  assert.deepEqual(await itemsSeenBy({ space: acme }, website), []);
+  assert.deepEqual(await pageSeenBy({ space: acme }, launch), ['Acme launches on 1 March']);
+  assert.deepEqual(await pageSeenBy({ space: acme }, design), []);
   await assert.rejects(
-    as({ space: acme }, (s) => writeItem(s, { spaceId: acme, body: 'A private note' })),
+    as({ space: acme }, (s) => writeItem(s, { pageId: launch, body: 'A private note' })),
     AccessDenied,
   );
 });
 
 test('an item never moves to another space or side', async () => {
   const ana = await person('Ana');
-  const { acme, launch, doubt } = await as(ana, async (s) => {
+  const { page, launch, doubt } = await as(ana, async (s) => {
     const acme = await createSpace(s, { name: 'Acme' });
-    const launch = await writeItem(s, { spaceId: acme, body: 'Acme launches on 1 March', shared: true });
-    const doubt = await writeItem(s, { spaceId: acme, body: 'Ana thinks the launch will slip' });
-    return { acme, launch, doubt };
+    const page = await createPage(s, { spaceId: acme, title: 'Launch', shared: true });
+    const launch = await writeItem(s, { pageId: page, body: 'Acme launches on 1 March', shared: true });
+    const doubt = await writeItem(s, { pageId: page, body: 'Ana thinks the launch will slip' });
+    return { page, launch, doubt };
   });
 
   // Publishing creates a new shared item instead, so nothing is shared by accident.
@@ -146,12 +160,21 @@ test('an item never moves to another space or side', async () => {
     as(ana, (s) => s.tx`update content set space_id = ${ana.personalSpaceId} where id = ${launch.id}`),
     refused,
   );
-  assert.deepEqual(await itemsSeenBy(ana, acme), ['Acme launches on 1 March', 'Ana thinks the launch will slip']);
+  assert.deepEqual(await pageSeenBy(ana, page), ['Acme launches on 1 March', 'Ana thinks the launch will slip']);
 });
 
 test('without a principal, nothing is visible', async () => {
-  await person('Ana');
-  for (const table of ['people', 'spaces', 'memberships', 'space_access', 'content']) {
+  const ana = await person('Ana');
+  await as(ana, async (s) => {
+    const acme = await createSpace(s, { name: 'Acme' });
+    const page = await createPage(s, { spaceId: acme, title: 'Launch', shared: true });
+    const email = await addSource(s, { spaceId: acme, excerpt: 'We launch on 1 March.', shared: true });
+    const item = await writeItem(s, { pageId: page, body: 'Acme launches in March', sources: [email.id], shared: true });
+    await updateItem(s, item.id, { body: 'Acme launches on 1 March' });
+  });
+
+  const tables = ['people', 'spaces', 'memberships', 'space_access', 'pages', 'content', 'sources', 'citations', 'revisions'];
+  for (const table of tables) {
     const [{ count }] = await db`select count(*)::int from ${db(table)}`;
     assert.equal(count, 0, table);
   }

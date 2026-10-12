@@ -33,7 +33,7 @@ This repository should read as if people wrote it for people.
 - Work one issue at a time, in small pull requests. Each issue says what someone can do when it is done.
 - Each pull request says what changed, why, and how it was tested.
 - The cross-client leak test (guarantee 2) runs on every change. `npm run check` and `npm test` must pass; the tests need the database from `docker compose up -d`.
-- A new table holding space data carries `space_id` and `private_to`, gets row-level security, and is added to the leak test.
+- A new table holding space data gets row-level security under the same access rule, and the leak test covers it.
 - Agree on UI design, component library and guidelines with the maintainer before building any screen people use.
 - The plan can change. If using Hivemind shows a better order, adapt.
 

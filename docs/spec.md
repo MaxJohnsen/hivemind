@@ -119,7 +119,7 @@ There is no claim extraction, no fact keys and no automatic dependencies between
 | Operation | Rule |
 |---|---|
 | Write or update an item | Only from evidence. New evidence updates only the items it affects. The agent finds them; there is no automatic dependency chain. |
-| Supersede an item | When evidence justifies it, such as an explicit change or a decision by someone with authority. The old item is kept as "was true until…". Newer isn't automatically right, so when it's unclear, both are marked uncertain. |
+| Supersede an item | When evidence justifies it, such as an explicit change or a decision by someone with authority. The old item is kept as "was true until…". Newer isn't automatically right, so when it's unclear, both are marked uncertain. A private update can replace shared knowledge in your own view without changing what others see, and it shows that others still see the earlier version. Hivemind suggests sharing meaningful updates when appropriate. |
 | Improve wording | Items written by agents only, and always regenerated from the item's sources, never from its previous text, so errors can't compound. |
 | Combine duplicates | Keep one item, citing both sources. |
 | Create, split or move | Items written by agents only. Text written by a person stays where it is and gets a link. |
@@ -128,7 +128,7 @@ There is no claim extraction, no fact keys and no automatic dependencies between
 
 Upkeep runs when new evidence arrives, and in a periodic tidy pass per space that handles splits, duplicates, contradictions and inactive pages. The space's routine tidies the shared side, and each person's routine tidies their own private items.
 
-**Text written by people is protected.** Agents can flag it or propose changes, but never rewrite it.
+**Text written by people is protected.** Agents never rewrite or supersede it. They can record conflicting evidence beside it, point out the difference and propose a change, but only a person decides whether it still holds. Agents keep what agents wrote up to date.
 
 **Conflicts are marked uncertain,** never silently resolved.
 

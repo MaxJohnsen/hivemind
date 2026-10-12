@@ -2,8 +2,11 @@ import postgres from 'postgres';
 
 export type Sql = postgres.Sql;
 
-/** Who a request or routine acts for. Every transaction runs as exactly one. */
-export type Principal = { person: string } | { space: string };
+/**
+ * Who a request or routine acts for. Every transaction runs as exactly one.
+ * The agent, if any, is what acts for them, such as "Claude Code".
+ */
+export type Principal = ({ person: string } | { space: string }) & { agent?: string };
 
 /** A transaction running as a principal. */
 export interface Session {
@@ -38,7 +41,8 @@ export async function withPrincipal<T>(
   return (await sql.begin(async (tx) => {
     await tx`
       select set_config('hivemind.person_id', ${person}, true),
-             set_config('hivemind.space_id', ${space}, true)
+             set_config('hivemind.space_id', ${space}, true),
+             set_config('hivemind.agent', ${principal.agent ?? ''}, true)
     `;
     return fn({ tx, principal });
   })) as T;
