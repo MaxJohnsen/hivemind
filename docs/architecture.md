@@ -71,6 +71,8 @@ Migrations run as a separate step before the server starts, so the running serve
 
 Until there is sign-in and a web app, a command-line tool sets up people, spaces and tokens, and edits guidance. It is a stand-in, not the intended way to use Hivemind.
 
+The command line and the database credentials are operator access. The command line takes any person's id without sign-in, and any connection with the credentials can mark itself as a person editing directly, so either can act as anyone, including changing guidance. An agent that can run commands where Hivemind runs, such as Claude Code on the same machine, has that access too. Once there is sign-in, a direct edit needs a signed-in person, and the command line keeps only what setting up an instance needs.
+
 ## Toward a hosted version
 
 Hivemind is designed so it could run as a managed service, without building that in v1. Roots are organizational boundaries, not tenant isolation. A hosted service would also need identities, credentials, storage, indexes and execution kept separate per tenant.
