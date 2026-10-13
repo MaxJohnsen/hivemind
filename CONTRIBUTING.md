@@ -28,6 +28,8 @@ claude mcp add --transport http hivemind http://localhost:4100/mcp --header "Aut
 
 Then ask Claude Code to remember something for that client, and ask about it in a new session. Ask it to write a report for the client, and the rule comes with the context.
 
+The command line acts as whoever you name, without sign-in, so treat it like the database password. An agent that can run commands on the same machine, such as Claude Code, can use it too, and can change guidance with it. Until Hivemind has sign-in, don't rely on "only people change guidance" there.
+
 To add a skill, run the command line from your checkout instead, so it can read the skill's folder on your computer. It connects to the database from Docker Compose.
 
 ```sh

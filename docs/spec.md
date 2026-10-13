@@ -21,6 +21,8 @@ These hold for everything that passes through Hivemind, whatever the implementat
 
 For its own routines, guarantee 1 holds by design: runs are scoped before they start, and content carries its sources (§5, §8). For external agents such as Claude or ChatGPT, Hivemind checks every action performed through it and asks before anything unauthorized. It cannot know what an agent saw elsewhere, and doesn't pretend to.
 
+The guarantees hold for everything that goes through Hivemind. Whoever can reach the server itself, such as its database or its administration tools, has operator access and can act as anyone. That is outside the guarantees, so agents must never be given it.
+
 Two release tests make guarantees 2 and 10 concrete:
 
 - **Leak test.** Two people in different client spaces, each with shared and private knowledge, try to read and write across clients through every storage path. The test runs through Hivemind and directly against the database with Hivemind's filters bypassed, so the database is shown to refuse on its own.
