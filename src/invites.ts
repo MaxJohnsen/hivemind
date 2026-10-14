@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Sql } from './db.ts';
 
 /** A one-time link for creating an account. Only a hash of its token is kept. */
@@ -25,7 +25,7 @@ export async function findInvite(sql: Sql, token: string): Promise<{ instanceAdm
 
 /**
  * Someone accepting an invite, between checking it and creating their
- * account with a passkey. It is signed, so nobody can change it on the way.
+ * account with a passkey. Homing keeps it, and the page holds only its id.
  */
 export interface Ticket {
   /** The hash of the invite's token. */
@@ -34,29 +34,10 @@ export interface Ticket {
   person: string;
   name: string;
   email: string;
-  expires: number;
 }
 
-export function issueTicket(secret: string, input: { token: string; name: string; email: string }): string {
-  const ticket: Ticket = {
-    invite: hash(input.token).toString('base64url'),
-    person: randomUUID(),
-    name: input.name,
-    email: input.email,
-    expires: Date.now() + 10 * 60 * 1000,
-  };
-  const body = Buffer.from(JSON.stringify(ticket)).toString('base64url');
-  return `${body}.${sign(secret, body)}`;
-}
-
-export function readTicket(secret: string, value: string | null | undefined): Ticket | undefined {
-  const [body, signature] = value?.split('.') ?? [];
-  if (!body || !signature) return undefined;
-  const expected = Buffer.from(sign(secret, body));
-  const given = Buffer.from(signature);
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return undefined;
-  const ticket = JSON.parse(Buffer.from(body, 'base64url').toString()) as Ticket;
-  return ticket.expires > Date.now() ? ticket : undefined;
+export function newTicket(input: { token: string; name: string; email: string }): Ticket {
+  return { invite: hash(input.token).toString('base64url'), person: randomUUID(), name: input.name, email: input.email };
 }
 
 /** Creates the ticket's person, with their personal space, and uses up the invite. */
@@ -70,8 +51,4 @@ function newToken(): string {
 
 function hash(token: string): Buffer {
   return createHash('sha256').update(token).digest();
-}
-
-function sign(secret: string, body: string): string {
-  return createHmac('sha256', secret).update(`homing.ticket.${body}`).digest('base64url');
 }

@@ -40,9 +40,14 @@ export class Browser {
   async join(token: string, person: { name: string; email: string }) {
     const joined = await this.json('/api/join', { token, ...person });
     if (joined.status !== 200) return joined;
-    const options = await this.json(`/api/auth/passkey/generate-register-options?context=${encodeURIComponent(joined.body.ticket)}`);
+    return this.register(joined.body.ticket);
+  }
+
+  /** Creates the account a join ticket is for, with a new passkey, and signs in. */
+  async register(ticket: string, credentialId?: Buffer) {
+    const options = await this.json(`/api/auth/passkey/generate-register-options?context=${encodeURIComponent(ticket)}`);
     if (options.status !== 200) return options;
-    return this.json('/api/auth/passkey/verify-registration', { response: this.passkeys.register(options.body), createSession: true });
+    return this.json('/api/auth/passkey/verify-registration', { response: this.passkeys.register(options.body, credentialId), createSession: true });
   }
 
   /** Adds another passkey to the signed-in account. */

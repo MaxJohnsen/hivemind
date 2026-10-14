@@ -20,10 +20,15 @@ export async function createPasskey(ticket?: string) {
   return api('/api/auth/passkey/verify-registration', { response, name: deviceName(), createSession: Boolean(ticket) });
 }
 
-/** Whether the person closed the passkey dialog, which needs no error message. */
+/** Whether the person closed the passkey dialog, or the page stopped it, which needs no error message. */
 export function cancelled(error: unknown): boolean {
-  if (error instanceof WebAuthnError) return error.code === 'ERROR_CEREMONY_ABORTED' || error.name === 'NotAllowedError';
-  return error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'AbortError');
+  return aborted(error) || (error instanceof Error && error.name === 'NotAllowedError');
+}
+
+/** Whether the page itself stopped waiting for a passkey, to ask for one another way. */
+export function aborted(error: unknown): boolean {
+  if (error instanceof WebAuthnError && error.code === 'ERROR_CEREMONY_ABORTED') return true;
+  return error instanceof Error && error.name === 'AbortError';
 }
 
 /** A passkey's name says where it was made, such as "Mac", so people can tell them apart. */

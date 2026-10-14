@@ -21,11 +21,11 @@ export class Authenticator {
     this.origin = origin;
   }
 
-  /** Creates a passkey, answering generate-register-options. */
-  register(options: Options) {
+  /** Creates a passkey, answering generate-register-options. Its id is random unless given. */
+  register(options: Options, id: Buffer = randomBytes(16)) {
     const rpId = options.rp.id as string;
     const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
-    const credential: Credential = { id: randomBytes(16), rpId, userHandle: options.user.id, privateKey, counter: 0 };
+    const credential: Credential = { id, rpId, userHandle: options.user.id, privateKey, counter: 0 };
     this.credentials.push(credential);
 
     const { x, y } = publicKey.export({ format: 'jwk' });
@@ -45,10 +45,10 @@ export class Authenticator {
       credential.id,
       coseKey,
     ]);
-    const id = credential.id.toString('base64url');
+    const credentialId = credential.id.toString('base64url');
     return {
-      id,
-      rawId: id,
+      id: credentialId,
+      rawId: credentialId,
       type: 'public-key',
       clientExtensionResults: {},
       authenticatorAttachment: 'platform',

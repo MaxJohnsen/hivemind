@@ -2,16 +2,15 @@ import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname } from 'node:path';
 import { fromNodeHeaders } from 'better-auth/node';
-import type { Auth } from './auth.ts';
+import { saveTicket, type Auth } from './auth.ts';
 import { withPrincipal, type Sql } from './db.ts';
-import { findInvite, issueTicket } from './invites.ts';
+import { findInvite, newTicket } from './invites.ts';
 
 /** What the web app's requests need from the server. */
 export interface App {
   sql: Sql;
   auth: Auth;
   url: URL;
-  secret: string;
 }
 
 /** Homing's own endpoints for its pages. Sign-in itself is Better Auth's, under /api/auth. */
@@ -44,7 +43,7 @@ export async function handleApi(app: App, req: IncomingMessage, res: ServerRespo
     if (await context.internalAdapter.findUserByEmail(email)) {
       return json(res, 409, { field: 'email', message: 'There is already an account with this email. Sign in instead.' });
     }
-    return json(res, 200, { ticket: issueTicket(app.secret, { token, name, email }) });
+    return json(res, 200, { ticket: await saveTicket(app.auth, newTicket({ token, name, email })) });
   }
 
   if (req.method === 'GET' && path === '/api/sign-in-options') {

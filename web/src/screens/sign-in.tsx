@@ -28,6 +28,7 @@ export function SignIn({
   email: initialEmail = '',
   passwords = true,
   providers = [],
+  notice,
   actions,
 }: {
   connecting?: string;
@@ -35,6 +36,8 @@ export function SignIn({
   email?: string;
   passwords?: boolean;
   providers?: Provider[];
+  /** A problem with a passkey picked in the email field. */
+  notice?: string;
   actions?: SignInActions;
 }) {
   const [step, setStep] = useState<SignInStep>(initial);
@@ -84,10 +87,10 @@ export function SignIn({
         {step === 'email' ? (
           <>
             <form className="flex flex-col gap-4" onSubmit={toPasskey} noValidate>
-              <Field data-invalid={Boolean(message) || undefined}>
+              <Field data-invalid={Boolean(message ?? notice) || undefined}>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
-                <Input id="email" type="email" autoComplete="username webauthn" className="h-11" value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(message) || undefined} />
-                {message && <FieldError>{message}</FieldError>}
+                <Input id="email" type="email" autoComplete="username webauthn" className="h-11" value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(message ?? notice) || undefined} />
+                {(message ?? notice) && <FieldError>{message ?? notice}</FieldError>}
               </Field>
               <Button type="submit" size="lg" className="h-11 w-full text-[15px]">Continue</Button>
             </form>

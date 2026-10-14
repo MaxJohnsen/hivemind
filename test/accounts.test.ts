@@ -18,19 +18,26 @@ import { authDatabaseUrl } from '../src/db.ts';
 describe('a new Homing', () => {
   let homing: Homing;
   let sql: ReturnType<typeof connect>;
+  let owner: ReturnType<typeof connect>;
 
   before(async () => {
     const urls = await freshDatabase('setup');
     sql = connect(urls.app);
+    owner = connect(urls.admin);
     homing = await startServer(sql, { port: 0, host: '127.0.0.1', authDatabase: urls.auth });
   });
 
   after(async () => {
     await homing.close();
-    await sql.end();
+    await Promise.all([sql.end(), owner.end()]);
   });
 
-  test('the setup link creates the first account, which looks after this Homing', async () => {
+  test('the first account, made with the setup link, looks after this Homing', async () => {
+    // A first sign-up that stopped halfway left a person without an account. That doesn't count.
+    await owner`select create_person('Half done', gen_random_uuid())`;
+    await owner`update people set instance_admin = true`;
+
+
     const earlier = fragment(await setupLink(sql, homing.url));
     const token = fragment(await setupLink(sql, homing.url));
     const browser = new Browser(homing.url);
@@ -104,6 +111,27 @@ describe('signing in', () => {
     assert.equal(stale.body.code, 'SIGN_IN_AGAIN');
   });
 
+  test('removing two passkeys at once still leaves one', async () => {
+    const browser = new Browser(homing.url);
+    const { id } = await join(browser, 'Ana');
+    assert.equal((await browser.addPasskey()).status, 200);
+    const [a, b] = await authDb`select id from auth.passkey where "userId" = ${id}`;
+
+    // The first removal holds the account while the second one waits, then sees it's the last.
+    const [first, second] = [await authDb.reserve(), await authDb.reserve()];
+    try {
+      await first`begin`;
+      await first`delete from auth.passkey where id = ${a.id}`;
+      const racing = second`delete from auth.passkey where id = ${b.id}`;
+      await first`commit`;
+      await assert.rejects(racing, { code: '23514' });
+    } finally {
+      first.release();
+      second.release();
+    }
+    assert.equal((await authDb`select count(*)::int as n from auth.passkey where "userId" = ${id}`)[0].n, 1);
+  });
+
   test('only the sign-in endpoints Homing uses can be reached', async () => {
     const browser = new Browser(homing.url);
     await join(browser, 'Ana');
@@ -154,24 +182,85 @@ describe('invites', () => {
     assert.equal((await authDb`select count(*)::int as n from auth.passkey where "userId" = ${id}`)[0].n, 1);
   });
 
-  test('a join ticket creates one account, and can’t be changed', async () => {
+  test('a join ticket creates one account, once, and only Homing makes them', async () => {
     const browser = new Browser(homing.url);
     const { body } = await browser.json('/api/join', { token: await invite(), name: 'Cara', email: `cara-${tag()}@acme.test` });
+    assert.equal((await browser.register('a-ticket-homing-never-made')).status, 400);
 
-    const [payload, signature] = body.ticket.split('.');
-    const changed = JSON.parse(Buffer.from(payload, 'base64url').toString());
-    changed.email = 'mallory@evil.test';
-    const forged = `${Buffer.from(JSON.stringify(changed)).toString('base64url')}.${signature}`;
-    assert.equal((await browser.json(`/api/auth/passkey/generate-register-options?context=${encodeURIComponent(forged)}`)).status, 400);
-
-    const register = async (who: Browser) => {
-      const options = await who.json(`/api/auth/passkey/generate-register-options?context=${encodeURIComponent(body.ticket)}`);
-      return who.json('/api/auth/passkey/verify-registration', { response: who.passkeys.register(options.body), createSession: true });
-    };
-    assert.equal((await register(browser)).status, 200);
+    const created = await browser.register(body.ticket);
+    assert.equal(created.status, 200);
     // Using it again would add a second passkey to the new account without signing in.
-    assert.equal((await register(new Browser(homing.url))).status, 400);
-    assert.equal((await authDb`select count(*)::int as n from auth.passkey where "userId" = ${changed.person}`)[0].n, 1);
+    assert.equal((await new Browser(homing.url).register(body.ticket)).status, 400);
+    assert.equal((await authDb`select count(*)::int as n from auth.passkey where "userId" = ${created.body.user.id}`)[0].n, 1);
+  });
+
+  test('a ticket only creates an account together with signing in', async () => {
+    const browser = new Browser(homing.url);
+    const token = await invite();
+    const { body } = await browser.json('/api/join', { token, name: 'Cara', email: `cara-${tag()}@acme.test` });
+    const options = await browser.json(`/api/auth/passkey/generate-register-options?context=${encodeURIComponent(body.ticket)}`);
+    const quiet = await browser.json('/api/auth/passkey/verify-registration', { response: browser.passkeys.register(options.body) });
+    assert.notEqual(quiet.status, 200);
+    assert.equal((await browser.json('/api/invite', { token })).status, 200);
+  });
+
+  test('a sign-up that fails halfway can be finished, and keeps its invite', async () => {
+    const ana = new Browser(homing.url);
+    await join(ana, 'Ana');
+    const taken = Buffer.from(ana.passkeys.credentials[0].id);
+
+    // Cara's device offers a passkey that is already Ana's, so her sign-up fails after her invite was checked.
+    const cara = new Browser(homing.url);
+    const token = await invite();
+    const { body } = await cara.json('/api/join', { token, name: 'Cara', email: `cara-${tag()}@acme.test` });
+    assert.notEqual((await cara.register(body.ticket, taken)).status, 200);
+    assert.equal((await cara.json('/api/me')).status, 401);
+
+    // Trying again with the same ticket finishes it.
+    assert.equal((await cara.register(body.ticket)).status, 200);
+    assert.equal((await cara.json('/api/me')).body.name, 'Cara');
+    assert.equal((await ana.signIn()).status, 200);
+  });
+
+  test('two sign-ups with the same email make one account, and the other invite still works', async () => {
+    const email = `ana-${tag()}@acme.test`;
+    const browser = new Browser(homing.url);
+    const token = await invite();
+    const { body } = await browser.json('/api/join', { token, name: 'Ana', email });
+
+    // Another sign-up with the same email is creating its account right now.
+    const { personId } = (await admin`select person_id from create_person('Ana', gen_random_uuid())`)[0];
+    const other = await authDb.reserve();
+    try {
+      await other`begin`;
+      await other`insert into auth."user" (id, name, email, "emailVerified") values (${personId}, 'Ana', ${email}, false)`;
+      const registering = browser.register(body.ticket);
+      await until(async () => (await admin`select count(*)::int as n from pg_stat_activity where wait_event_type = 'Lock'`)[0].n > 0);
+      await other`commit`;
+      assert.equal((await registering).status, 409);
+    } finally {
+      other.release();
+    }
+    assert.equal((await browser.json('/api/invite', { token })).status, 200);
+  });
+
+  test('a passkey belongs to one account', async () => {
+    const ana = new Browser(homing.url);
+    await join(ana, 'Ana');
+    const ben = new Browser(homing.url);
+    const { body } = await ben.json('/api/join', { token: await invite(), name: 'Ben', email: `ben-${tag()}@beta.test` });
+    assert.notEqual((await ben.register(body.ticket, Buffer.from(ana.passkeys.credentials[0].id))).status, 200);
+    await ana.signOut();
+    assert.equal((await ana.signIn()).status, 200);
+  });
+
+  test('Homing’s own requests are refused from other sites', async () => {
+    const response = await fetch(new URL('/api/join', homing.url), {
+      method: 'POST',
+      headers: { origin: 'https://evil.test', 'content-type': 'application/json' },
+      body: JSON.stringify({ token: await invite(), name: 'Mallory', email: `mallory-${tag()}@evil.test` }),
+    });
+    assert.equal(response.status, 403);
   });
 
   test('you can’t accept an invite while signed in', async () => {
@@ -228,3 +317,10 @@ function fragment(link: string | undefined): string {
 }
 
 const tag = () => randomBytes(4).toString('hex');
+
+async function until(condition: () => Promise<boolean>) {
+  for (let tries = 0; !(await condition()); tries++) {
+    if (tries > 100) throw new Error('timed out');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}

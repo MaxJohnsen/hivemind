@@ -25,6 +25,19 @@ export async function api<T = Record<string, unknown>>(path: string, body?: unkn
 
 /** Where to go after signing in: a page of Homing's own, never another site. */
 export function nextPage(fallback = '/account'): string {
-  const next = new URLSearchParams(location.search).get('next');
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : fallback;
+  return samePage(new URLSearchParams(location.search).get('next'), location.origin, fallback);
+}
+
+/**
+ * A page on this origin, by the browser's own reading of the address, so
+ * tricks like `/\evil.com` or a tab after the slash lead nowhere else.
+ */
+export function samePage(next: string | null, origin: string, fallback: string): string {
+  if (!next?.startsWith('/')) return fallback;
+  try {
+    const url = new URL(next, origin);
+    return url.origin === origin ? url.pathname + url.search + url.hash : fallback;
+  } catch {
+    return fallback;
+  }
 }

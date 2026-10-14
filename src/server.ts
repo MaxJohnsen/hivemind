@@ -77,7 +77,7 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
   auth = authHandler(homingAuth);
   // Refuses requests addressed to other host names, which protects a local install from DNS rebinding.
   validateHost = hostHeaderValidation(isLocal(url) ? localhostAllowedHostnames() : [url.hostname]);
-  app = { sql, auth: homingAuth, url, secret };
+  app = { sql, auth: homingAuth, url };
 
   return {
     url,
