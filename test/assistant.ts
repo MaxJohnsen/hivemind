@@ -24,10 +24,19 @@ function metadata(clientId: string, name: string) {
   };
 }
 
+/** A site Homing doesn't trust, which publishes a metadata document all the same. */
+export const stranger = metadata('https://stranger.test/oauth/metadata.json', 'Claude');
+
+/** Server options for tests: the stand-in sites, and that their assistants may connect. */
+export const testAssistants = {
+  fetchClientMetadata,
+  assistantSites: Object.values(assistants).map((assistant) => new URL(assistant.client_id).hostname),
+};
+
 /** Stands in for the assistants' sites, which are outside Homing. */
 export async function fetchClientMetadata(input: RequestInfo | URL): Promise<Response> {
   const url = input instanceof Request ? input.url : String(input);
-  const document = Object.values(assistants).find((assistant) => assistant.client_id === url);
+  const document = [...Object.values(assistants), stranger].find((assistant) => assistant.client_id === url);
   return document ? Response.json(document) : new Response('Not found', { status: 404 });
 }
 
@@ -70,10 +79,13 @@ export class Assistant {
     if (consent.pathname !== '/connect') return { page: consent };
     const decided = await browser.json('/api/auth/oauth2/consent', { accept: choice.allow, oauth_query: signedQuery(consent.search) });
     const callback = new URL(decided.body.url ?? decided.body.redirect_uri);
-    if (callback.searchParams.has('code')) {
-      await new StreamableHTTPClientTransport(this.mcpUrl, { authProvider: this.provider }).finishAuth(callback.searchParams);
-    }
+    if (callback.searchParams.has('code')) await this.finish(callback);
     return { page: consent, callback };
+  }
+
+  /** Redeems the authorization code Homing sent back, for tokens. */
+  async finish(callback: URL) {
+    await new StreamableHTTPClientTransport(this.mcpUrl, { authProvider: this.provider }).finishAuth(callback.searchParams);
   }
 
   /** A new MCP session, like a new conversation. */

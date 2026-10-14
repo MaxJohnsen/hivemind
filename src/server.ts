@@ -26,6 +26,8 @@ export interface ServerOptions {
   rateLimit?: boolean;
   /** Fetches assistants' client metadata documents. Tests replace it. */
   fetchClientMetadata?: AuthSettings['fetchClientMetadata'];
+  /** The sites whose assistants may connect. By default HOMING_ASSISTANT_SITES, or Claude's and ChatGPT's. */
+  assistantSites?: string[];
 }
 
 export interface Homing {
@@ -57,17 +59,17 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
       req.headers[clientAddressHeader] = clientAddress(req, proxies);
       const path = new URL(req.url ?? '/', app.url).pathname;
       if (path === '/mcp') {
-        const token = /^Bearer (\S+)$/i.exec(req.headers.authorization ?? '')?.[1];
-        const principal = token ? await verifyToken(token) : undefined;
+        const dpop = req.headers.dpop;
+        const principal = await verifyToken({ authorization: req.headers.authorization, dpop: typeof dpop === 'string' ? dpop : undefined, method: req.method ?? 'GET' });
         if (!principal) {
           // Tells the assistant where to sign the person in (RFC 9728).
           const metadata = new URL('/.well-known/oauth-protected-resource/mcp', app.url);
-          const challenge = `Bearer resource_metadata="${metadata}"${token ? ', error="invalid_token"' : ''}`;
+          const challenge = `Bearer resource_metadata="${metadata}"${req.headers.authorization ? ', error="invalid_token"' : ''}`;
           res.writeHead(401, { 'www-authenticate': challenge, 'content-type': 'application/json' });
           res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Sign in to Homing to connect.' }, id: null }));
           return;
         }
-        const info: AuthInfo = { token: token ?? '', clientId: principal.agent, scopes: [], extra: { principal } };
+        const info: AuthInfo = { token: principal.token, clientId: principal.agent, scopes: [], extra: { principal } };
         await mcp(Object.assign(req, { auth: info }) as IncomingMessage & { auth: AuthInfo }, res);
       } else if (path.startsWith('/api/auth/') || path.startsWith('/.well-known/')) {
         if (authEndpoints.has(`${req.method} ${path}`)) await auth(req, res);
@@ -96,6 +98,7 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
     passwords: process.env.HOMING_PASSWORDS !== 'off',
     rateLimit: options.rateLimit ?? !isLocal(url),
     fetchClientMetadata: options.fetchClientMetadata,
+    assistantSites: options.assistantSites ?? assistantSites,
   });
   verifyToken = tokenVerifier(homingAuth, pool, url);
 
@@ -116,6 +119,9 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
     },
   };
 }
+
+/** The sites whose assistants may connect: Claude (claude.ai and Claude Code) and ChatGPT, unless set. */
+const assistantSites = (process.env.HOMING_ASSISTANT_SITES || 'claude.ai,chatgpt.com').split(',').map((site) => site.trim()).filter(Boolean);
 
 /** Where Homing is reached, which decides the host names it answers to. */
 const configuredUrl = process.env.HOMING_URL ? new URL(process.env.HOMING_URL) : undefined;

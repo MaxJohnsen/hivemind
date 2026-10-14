@@ -12,14 +12,14 @@ import { saveSkill } from '../src/skills.ts';
 import { startServer, type Homing } from '../src/server.ts';
 import { addMember, createSpace } from '../src/spaces.ts';
 import { authDatabaseUrl } from '../src/db.ts';
-import { Assistant, fetchClientMetadata } from './assistant.ts';
+import { Assistant, testAssistants } from './assistant.ts';
 import { as, db, member, type Member } from './helpers.ts';
 import { inTestDatabase } from './reset.ts';
 
 let homing: Homing;
 
 before(async () => {
-  homing = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase: inTestDatabase(authDatabaseUrl), fetchClientMetadata });
+  homing = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase: inTestDatabase(authDatabaseUrl), ...testAssistants });
 });
 
 after(() => homing.close());

@@ -7,14 +7,17 @@ import { after, before, test } from 'node:test';
 import { authDatabaseUrl } from '../src/db.ts';
 import { startServer, type Homing } from '../src/server.ts';
 import { createSpace } from '../src/spaces.ts';
-import { Assistant, assistants, fetchClientMetadata } from './assistant.ts';
+import { signJWT } from 'better-auth/plugins';
+import { calculateJwkThumbprint, exportJWK, generateKeyPair, SignJWT } from 'jose';
+import { createHash, randomUUID } from 'node:crypto';
+import { Assistant, assistants, stranger, testAssistants } from './assistant.ts';
 import { admin, as, authDb, db, member } from './helpers.ts';
 import { inTestDatabase } from './reset.ts';
 
 let homing: Homing;
 
 before(async () => {
-  homing = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase: inTestDatabase(authDatabaseUrl), fetchClientMetadata });
+  homing = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase: inTestDatabase(authDatabaseUrl), ...testAssistants });
 });
 
 after(() => homing.close());
@@ -73,12 +76,18 @@ test('an assistant that hasn’t signed in gets nothing, and is told where to si
   assert.equal(server.registration_endpoint, undefined);
 
   assert.equal((await call('Bearer not-a-token')).status, 401);
-  // A token Homing signed for something other than /mcp isn't accepted either, even for a connected assistant.
+  // Only Homing's access tokens for /mcp work, even for a connected assistant: not a token for
+  // something else, and not another kind of token, such as an ID token.
   await new Assistant(homing.url).connect(ana.browser);
-  const { token } = await homing.auth.api.signJWT({
-    body: { payload: { sub: ana.id, azp: assistants.claude.client_id, aud: 'https://elsewhere.test/api', iss: new URL('/api/auth', homing.url).toString(), iat: Math.floor(Date.now() / 1000) } },
-  });
-  assert.equal((await call(`Bearer ${token}`)).status, 401);
+  const signed = async (audience: string, typ?: string) => {
+    const context = { context: await homing.auth.$context };
+    const payload = { sub: ana.id, azp: assistants.claude.client_id, aud: audience, iss: new URL('/api/auth', homing.url).toString(), iat: Math.floor(Date.now() / 1000) };
+    return signJWT(context as never, { options: {}, payload, ...(typ && { header: { typ } }) });
+  };
+  const mcp = new URL('/mcp', homing.url).toString();
+  assert.notEqual((await call(`Bearer ${await signed(mcp, 'at+jwt')}`)).status, 401);
+  assert.equal((await call(`Bearer ${await signed('https://elsewhere.test/api', 'at+jwt')}`)).status, 401);
+  assert.equal((await call(`Bearer ${await signed(mcp)}`)).status, 401);
 });
 
 test('disconnecting an assistant stops it at once, and it can’t get new tokens', async () => {
@@ -160,4 +169,93 @@ test('nobody, the instance admin included, can act as someone else', async () =>
   await ida.browser.json('/api/assistants/disconnect', { clientId: assistants.claude.client_id });
   assert.match((await (await anas.open()).call('search', { query: 'Acme launches' })).text, /Acme launches on 1 March/);
   assert.equal((await authDb`select count(*)::int as n from auth."oauthConsent" where "userId" = ${ana.id}`)[0].n, 1);
+});
+
+test('a token bound to a key works only with a fresh proof from that key', async () => {
+  const ana = await member(homing.url, 'Ana');
+  const claude = new Assistant(homing.url);
+  await claude.connect(ana.browser);
+
+  // The assistant asks for a token bound to its own key (DPoP, RFC 9449).
+  const { privateKey, publicKey } = await generateKeyPair('ES256');
+  const jwk = await exportJWK(publicKey);
+  const proof = (method: string, url: string, token?: string) =>
+    new SignJWT({ htm: method, htu: url, jti: randomUUID(), ...(token && { ath: createHash('sha256').update(token).digest('base64url') }) })
+      .setProtectedHeader({ typ: 'dpop+jwt', alg: 'ES256', jwk })
+      .setIssuedAt()
+      .sign(privateKey);
+  const tokenUrl = new URL('/api/auth/oauth2/token', homing.url).toString();
+  const refreshed = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', dpop: await proof('POST', tokenUrl) },
+    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: claude.tokens!.refresh_token!, client_id: assistants.claude.client_id }),
+  });
+  const bound = await refreshed.json();
+  assert.equal(bound.token_type, 'DPoP');
+  assert.equal(JSON.parse(Buffer.from(bound.access_token.split('.')[1], 'base64url').toString()).cnf.jkt, await calculateJwkThumbprint(jwk));
+
+  const mcp = new URL('/mcp', homing.url).toString();
+  const call = (authorization: string, dpop?: string) =>
+    fetch(mcp, {
+      method: 'POST',
+      headers: { authorization, ...(dpop && { dpop }), 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    }).then((response) => response.status);
+
+  const fresh = await proof('POST', mcp, bound.access_token);
+  assert.notEqual(await call(`DPoP ${bound.access_token}`, fresh), 401);
+  // Not without a proof, not as a plain bearer token, and not with a proof used before.
+  assert.equal(await call(`DPoP ${bound.access_token}`), 401);
+  assert.equal(await call(`Bearer ${bound.access_token}`), 401);
+  assert.equal(await call(`DPoP ${bound.access_token}`, fresh), 401);
+});
+
+test('a disconnected assistant can’t come back with what it had before', async () => {
+  const ana = await member(homing.url, 'Ana');
+  const before = new Assistant(homing.url);
+  await before.connect(ana.browser);
+  // A second authorization, which the person already allowed, gets a code at once.
+  const pending = new Assistant(homing.url);
+  const { page: callback } = await pending.connect(ana.browser);
+  assert.ok(callback.searchParams.has('code'));
+
+  await ana.browser.json('/api/assistants/disconnect', { clientId: assistants.claude.client_id });
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  const after = new Assistant(homing.url);
+  await after.connect(ana.browser);
+
+  // Neither the code from before nor the refresh token from before gets anything.
+  await assert.rejects(pending.finish(callback));
+  const refresh = await fetch(new URL('/api/auth/oauth2/token', homing.url), {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: before.tokens!.refresh_token!, client_id: assistants.claude.client_id }),
+  });
+  assert.equal(refresh.status, 400);
+  // And trying doesn't harm the new connection.
+  const session = await after.open();
+  assert.equal((await session.call('context', { request: 'What am I working on?' })).failed, false);
+  const renewed = await fetch(new URL('/api/auth/oauth2/token', homing.url), {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: after.tokens!.refresh_token!, client_id: assistants.claude.client_id }),
+  });
+  assert.equal(renewed.status, 200);
+});
+
+test('only assistants from sites Homing trusts can connect', async () => {
+  const ana = await member(homing.url, 'Ana');
+  const authorize = new URL('/api/auth/oauth2/authorize', homing.url);
+  authorize.search = new URLSearchParams({
+    response_type: 'code',
+    client_id: stranger.client_id,
+    redirect_uri: stranger.redirect_uris[0],
+    code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+    code_challenge_method: 'S256',
+    scope: 'nonsense',
+  }).toString();
+  const response = await ana.browser.fetch(authorize.pathname + authorize.search);
+  const next = response.headers.get('location') ?? (await response.json().catch(() => ({}))).url ?? '';
+  // Not even an error goes back to its address, so Homing can't be used to send people elsewhere.
+  assert.ok(!String(next).startsWith(stranger.redirect_uris[0]), next);
 });

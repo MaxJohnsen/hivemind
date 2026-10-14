@@ -24,6 +24,12 @@ export interface AuthSettings {
    * replace it, since that site is outside Homing.
    */
   fetchClientMetadata?: typeof fetchClientMetadataResource;
+  /**
+   * The sites whose assistants may connect, by the host of their client
+   * metadata document, or `*` for any. Each one can send people back to its
+   * own addresses, so Homing doesn't trust every site that publishes one.
+   */
+  assistantSites: string[];
 }
 
 /** Where the server puts the address a request comes from, for sign-in's rate limits. */
@@ -137,6 +143,8 @@ export function createAuth(sql: Sql, pool: Pool, settings: AuthSettings) {
       cimd({
         fetchClientMetadataResource: settings.fetchClientMetadata ?? fetchClientMetadataResource,
         metadataProfile: 'mcp-2026-07-28',
+        isMetadataDocumentUrlAllowed: (clientId) =>
+          settings.assistantSites.includes('*') || settings.assistantSites.includes(new URL(clientId).hostname),
       }),
     ],
   });

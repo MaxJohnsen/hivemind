@@ -30,6 +30,7 @@ Open the link to create your account with a passkey. It works once, for an hour;
 | `HOMING_SECRET` | Signs sessions: at least 32 random characters, such as from `openssl rand -base64 32`. Homing won't start without one, except when it listens only on localhost, as `npm test` does. Changing it signs everyone out |
 | `HOMING_PASSWORDS` | `off` turns off signing in with a password. Passkeys always work |
 | `HOMING_TRUSTED_PROXIES` | The reverse proxies in front of Homing, as addresses or ranges like `172.16.0.0/12`. Only their `X-Forwarded-For` counts for sign-in's rate limits; otherwise Homing uses the connection's own address |
+| `HOMING_ASSISTANT_SITES` | The sites whose assistants may connect, by the host of their client metadata document. Defaults to `claude.ai,chatgpt.com`; `*` allows any |
 
 ### Trying it with Claude Code
 
