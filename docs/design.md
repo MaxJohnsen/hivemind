@@ -20,6 +20,17 @@ How Homing's screens look and behave. People work with Homing through their assi
 
 The headline never mentions AI, so the sentence under it goes with it wherever someone meets Homing for the first time.
 
+## Logo
+
+<img src="design/logo.svg" alt="The folded paper bird" width="96">
+
+The mark is the folded paper bird: flat facets in two sages, with a peach beak. It's the pencil bird simplified so it holds up at 16 px and in a browser tab. The vector is [`docs/design/logo.svg`](design/logo.svg).
+
+- Next to the name it sits at 1.4 times the text height, with "Homing" in Figtree semibold. That pair signs every page.
+- The mark alone is for places where the name is already clear, such as the browser tab.
+- On dark surfaces its facets lighten, through the `mark-light` and `mark-dark` tokens. Otherwise it is never recolored, stretched, outlined or rotated.
+- The pencil bird is the mascot for drawings, and the mark is the signature. One doesn't replace the other.
+
 ## Look
 
 Linen backgrounds, sage for actions and peach for what's only yours. Light only for now; dark mode comes later through the same tokens.
@@ -37,7 +48,7 @@ Linen backgrounds, sage for actions and peach for what's only yours. Light only 
 | `change` | `#EEF3EC` | The exact change being decided |
 | `wash` | `#E9A98F` | Peach, for small accents |
 
-Homing is a wordmark in Figtree for now; a logo comes later. Figtree is the only typeface, and it ships with the app. Page titles are 24 px, the exact change 18 px, body text 15 px, secondary text 13 to 14 px and labels 12 px. Corners start at 14 px, and buttons and fields are pills.
+Figtree is the only typeface, and it ships with the app. Page titles are 24 px, the exact change 18 px, body text 15 px, secondary text 13 to 14 px and labels 12 px. Corners start at 14 px, and buttons and fields are pills.
 
 ## Components
 
@@ -51,7 +62,7 @@ Homing is a wordmark in Figtree for now; a logo comes later. Figtree is the only
 
 ## Layout
 
-- The wordmark sits top left, the person's name top right.
+- The mark and name sit top left, the person's name top right.
 - Sign-in asks for the email first, then the passkey or password, and the email field offers saved passkeys directly. On a desktop the form is on the left and the illustration on the right, with the tagline; on a phone only the form shows, starting near the top.
 - Sign-in with Google or Microsoft uses the providers' own marks, as their guidelines ask.
 - Decision pages are one centered column with a single heading that says who wants what, where.
@@ -75,7 +86,7 @@ The bird always looks like its character sheet, [`docs/design/paper-bird.jpg`](d
 
 > Soft colored-pencil drawing with gentle visible pencil texture, rounded friendly shapes, a muted pastel palette of sage green, soft peach and warm gray, light and airy. Plenty of empty space, nothing cropped. Pure flat white background. No text, no logos, no screens.
 
-On the sign-in page the bird sits on the edge of the sign-in card.
+On the sign-in page the bird flies in over the top right of the sign-in card, carrying a written note: knowledge brought to the person signing in.
 
 ## The approval card
 
