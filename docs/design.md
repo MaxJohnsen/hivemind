@@ -69,7 +69,7 @@ Every drawing says something about Hivemind, with the same few objects:
 | Rules | A note pinned to the wall |
 | Kept current | An old date crossed out, with a new card beside it |
 
-Drawings are scenes with people, in colored pencil, in sage, peach and warm grey, light and airy. They appear only on welcome, onboarding, success and empty pages, never on approvals or routine screens. They're drawn on pure white, so they blend into the linen without a box. No robots, brains, bees, hexagons or screens.
+Drawings are scenes with people, in colored pencil, in sage, peach and warm grey, light and airy. They appear only on welcome, onboarding, success and empty pages, never on approvals or routine screens. They're drawn on pure white and shipped with a transparent background, so they sit on any surface without a box. No robots, brains, bees, hexagons or screens.
 
 The bird always looks like its character sheet, [`docs/design/paper-bird.jpg`](design/paper-bird.jpg): sage wings, a peach beak and belly, a small dark eye, the same folds. Every drawing with the bird is generated with the sheet as a reference, in this style:
 

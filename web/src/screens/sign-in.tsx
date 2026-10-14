@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Wordmark } from '@/components/wordmark';
-import bird from '@/assets/illustrations/bird.jpg';
-import scene from '@/assets/illustrations/signin.jpg';
+import bird from '@/assets/illustrations/bird.png';
+import scene from '@/assets/illustrations/signin.png';
 
 export type SignInStep = 'email' | 'passkey' | 'password' | 'wrong';
 
@@ -29,7 +29,7 @@ export function SignIn({ connecting, initial = 'email' }: { connecting?: string;
         <Wordmark className="text-lg" />
         <main className="flex flex-1 items-start pt-10 pb-10 sm:items-center">
           <div className="relative mx-auto flex w-full max-w-sm flex-col gap-7 rounded-2xl border bg-card p-6 sm:p-8">
-            <img src={bird} alt="" width={300} height={250} className="illustration pointer-events-none absolute right-6 -top-[71px] w-24" />
+            <img src={bird} alt="" width={300} height={250} className="pointer-events-none absolute right-6 -top-[71px] w-24" />
             <div className="flex flex-col gap-1.5">
               <h1 className="text-[28px] leading-tight font-semibold tracking-tight">
                 {connecting ? `Sign in to connect ${connecting}` : 'Sign in to Hivemind'}
@@ -93,7 +93,7 @@ export function SignIn({ connecting, initial = 'email' }: { connecting?: string;
       </div>
 
       <aside className="m-3 hidden flex-col items-center justify-center gap-8 rounded-3xl bg-muted px-12 py-16 lg:flex">
-        <img src={scene} alt="" width={1200} height={800} className="illustration w-full max-w-md" />
+        <img src={scene} alt="" width={960} height={640} loading="lazy" className="w-full max-w-md" />
         <div className="flex max-w-md flex-col gap-3 text-center">
           <p className="text-2xl leading-snug font-semibold tracking-tight text-balance">A home for everything worth knowing.</p>
           <p className="text-[15px] leading-relaxed text-pretty text-muted-foreground">

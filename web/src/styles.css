@@ -35,9 +35,3 @@
   --change: #eef3ec; /* the exact change someone is deciding on */
   --wash: #e9a98f; /* peach, for small accents such as the wordmark dot */
 }
-
-/* Illustrations are drawn on pure white, so multiplying them onto linen leaves no box. */
-.illustration {
-  mix-blend-mode: multiply;
-}
-
