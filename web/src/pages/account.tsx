@@ -26,6 +26,14 @@ export function AccountPage() {
       account={account}
       welcome={welcome}
       actions={{
+        async disconnect(clientId) {
+          try {
+            await api('/api/assistants/disconnect', { clientId });
+            await load();
+          } catch (error) {
+            return error instanceof Error ? error.message : 'Something went wrong. Try again.';
+          }
+        },
         async addPasskey() {
           try {
             await createPasskey();

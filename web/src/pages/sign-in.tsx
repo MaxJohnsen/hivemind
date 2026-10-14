@@ -1,15 +1,26 @@
 import { useEffect, useState } from 'react';
 import { browserSupportsWebAuthnAutofill, WebAuthnAbortService } from '@simplewebauthn/browser';
-import { api, ApiError, nextPage } from '@/lib/api';
+import { api, ApiError, nextPage, oauthQuery } from '@/lib/api';
 import { aborted, cancelled, signInWithPasskey } from '@/lib/passkeys';
 import { SignIn, wrongPassword } from '@/screens/sign-in';
 
 export function SignInPage() {
   const [passwords, setPasswords] = useState(true);
   const [notice, setNotice] = useState<string>();
+  const [connecting, setConnecting] = useState<string>();
 
   useEffect(() => {
     api<{ passwords: boolean }>('/api/sign-in-options').then((options) => setPasswords(options.passwords), () => {});
+    // An assistant sent the person here to sign in before they allow it.
+    const clientId = new URLSearchParams(location.search).get('client_id');
+    if (clientId && oauthQuery().oauth_query) {
+      const site = hostOf(clientId);
+      setConnecting(site);
+      api<{ client_name?: string }>('/api/auth/oauth2/public-client-prelogin', { client_id: clientId, ...oauthQuery() }).then(
+        (client) => setConnecting(client.client_name || site),
+        () => {},
+      );
+    }
   }, []);
 
   // Offers saved passkeys in the email field, and signs in when one is picked there. Homing
@@ -44,6 +55,7 @@ export function SignInPage() {
   return (
     <SignIn
       notice={notice}
+      connecting={connecting}
       passwords={passwords}
       actions={{
         async passkey() {
@@ -56,7 +68,7 @@ export function SignInPage() {
         },
         async password(email, password) {
           try {
-            signedIn(await api('/api/auth/sign-in/email', { email, password }));
+            signedIn(await api('/api/auth/sign-in/email', { email, password, ...oauthQuery() }));
           } catch (error) {
             if (error instanceof ApiError && error.status === 429) return 'Too many tries. Wait a minute, then try again.';
             return wrongPassword;
@@ -69,4 +81,12 @@ export function SignInPage() {
 
 function signedIn(result: { url?: string }) {
   location.assign(result.url ?? nextPage());
+}
+
+function hostOf(clientId: string): string {
+  try {
+    return new URL(clientId).hostname;
+  } catch {
+    return clientId;
+  }
 }

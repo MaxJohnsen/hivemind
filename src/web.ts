@@ -2,7 +2,9 @@ import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname } from 'node:path';
 import { fromNodeHeaders } from 'better-auth/node';
-import { saveTicket, type Auth } from './auth.ts';
+import type { Pool } from 'pg';
+import { connectedAssistants, disconnectAssistant } from './assistants.ts';
+import { mcpResource, saveTicket, type Auth } from './auth.ts';
 import { withPrincipal, type Sql } from './db.ts';
 import { findInvite, newTicket } from './invites.ts';
 
@@ -10,6 +12,8 @@ import { findInvite, newTicket } from './invites.ts';
 export interface App {
   sql: Sql;
   auth: Auth;
+  /** Sign-in's own connection, as homing_auth. */
+  authPool: Pool;
   url: URL;
 }
 
@@ -62,7 +66,19 @@ export async function handleApi(app: App, req: IncomingMessage, res: ServerRespo
       email: session.user.email,
       instanceAdmin: person?.instanceAdmin ?? false,
       passkeys: passkeys.map(({ id, name, createdAt }) => ({ id, name: name ?? null, createdAt })),
+      assistants: await connectedAssistants(app.authPool, session.user.id),
+      mcpUrl: mcpResource(app.url),
     });
+  }
+
+  if (req.method === 'POST' && path === '/api/assistants/disconnect') {
+    const session = await app.auth.api.getSession({ headers });
+    if (!session) return json(res, 401, { message: 'Sign in first.' });
+    const { clientId } = await readJson(req);
+    if (typeof clientId !== 'string' || !(await disconnectAssistant(app.authPool, session.user.id, clientId))) {
+      return json(res, 404, { message: 'That assistant isn’t connected.' });
+    }
+    return json(res, 200, {});
   }
 
   return json(res, 404, { message: 'Not found.' });
@@ -71,7 +87,7 @@ export async function handleApi(app: App, req: IncomingMessage, res: ServerRespo
 const dist = new URL('../web/dist/app/', import.meta.url);
 
 /** The pages of the web app. Each one loads the same single-page app. */
-const pages = new Set(['/sign-in', '/setup', '/join', '/account']);
+const pages = new Set(['/sign-in', '/setup', '/join', '/account', '/connect']);
 
 const types: Record<string, string> = {
   '.js': 'text/javascript; charset=utf-8',

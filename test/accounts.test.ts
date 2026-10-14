@@ -3,17 +3,16 @@
 // an invite, and nothing about sign-in lets anyone into someone else's account.
 
 import assert from 'node:assert/strict';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import { getMigrations } from 'better-auth/db/migration';
-import { connect } from '../src/db.ts';
+import { authDatabaseUrl, connect } from '../src/db.ts';
 import { setupLink } from '../src/invites.ts';
 import { startServer, type Homing } from '../src/server.ts';
 import { createSpace, listSpaces } from '../src/spaces.ts';
 import { Browser } from './browser.ts';
-import { admin, as, authDb, db, person } from './helpers.ts';
+import { admin, as, authDb, db, invite, person } from './helpers.ts';
 import { freshDatabase, inTestDatabase } from './reset.ts';
-import { authDatabaseUrl } from '../src/db.ts';
 
 describe('a new Homing', () => {
   let homing: Homing;
@@ -341,17 +340,6 @@ test('Better Auth finds every table and column it needs', async () => {
     await homing.close();
   }
 });
-
-/** A new invite, made the way the instance admin will. */
-async function invite(options: { expired?: boolean } = {}): Promise<string> {
-  const token = randomBytes(32).toString('base64url');
-  const hash = createHash('sha256').update(token).digest();
-  await admin`
-    insert into invites (hash, expires_at)
-    values (${hash}, now() + ${options.expired ? '-1 minute' : '1 hour'}::interval)
-  `;
-  return token;
-}
 
 /** Someone joins with a passkey through a new invite, and is signed in. */
 async function join(browser: Browser, name: string) {

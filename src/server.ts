@@ -4,11 +4,11 @@ import { hostHeaderValidation, toNodeHandler } from '@modelcontextprotocol/node'
 import { createMcpHandler, localhostAllowedHostnames, type AuthInfo } from '@modelcontextprotocol/server';
 import { toNodeHandler as authHandler } from 'better-auth/node';
 import { Pool } from 'pg';
-import { authEndpoints, clientAddressHeader, createAuth, type Auth } from './auth.ts';
+import { tokenVerifier, type AgentPrincipal } from './assistants.ts';
+import { authEndpoints, clientAddressHeader, createAuth, type Auth, type AuthSettings } from './auth.ts';
 import { authDatabaseUrl, connect, type Sql } from './db.ts';
 import { setupLink } from './invites.ts';
 import { mcpServer } from './mcp.ts';
-import { authenticate, type AgentPrincipal } from './tokens.ts';
 import { handleApi, serveApp, type App } from './web.ts';
 
 export interface ServerOptions {
@@ -24,6 +24,8 @@ export interface ServerOptions {
   trustedProxies?: string;
   /** Whether sign-in limits how often each client tries. By default on, except for a local install. */
   rateLimit?: boolean;
+  /** Fetches assistants' client metadata documents. Tests replace it. */
+  fetchClientMetadata?: AuthSettings['fetchClientMetadata'];
 }
 
 export interface Homing {
@@ -33,7 +35,7 @@ export interface Homing {
   close(): Promise<void>;
 }
 
-/** Serves the web app, sign-in, and MCP at /mcp. */
+/** Serves the web app, sign-in, and MCP at /mcp for signed-in assistants. */
 export async function startServer(sql: Sql, options: ServerOptions): Promise<Homing> {
   const configured = options.url ?? configuredUrl;
   const secret = options.secret ?? secretFor(configured, options.host);
@@ -41,6 +43,7 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
   let app: App | undefined;
   let mcp: ReturnType<typeof toNodeHandler>;
   let auth: ReturnType<typeof authHandler>;
+  let verifyToken: ReturnType<typeof tokenVerifier>;
   let validateHost: ReturnType<typeof hostHeaderValidation>;
 
   const server = createServer(async (req, res) => {
@@ -55,15 +58,19 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
       const path = new URL(req.url ?? '/', app.url).pathname;
       if (path === '/mcp') {
         const token = /^Bearer (\S+)$/i.exec(req.headers.authorization ?? '')?.[1];
-        const principal = token && (await authenticate(sql, token));
+        const principal = token ? await verifyToken(token) : undefined;
         if (!principal) {
-          res.writeHead(401, { 'www-authenticate': 'Bearer' }).end();
+          // Tells the assistant where to sign the person in (RFC 9728).
+          const metadata = new URL('/.well-known/oauth-protected-resource/mcp', app.url);
+          const challenge = `Bearer resource_metadata="${metadata}"${token ? ', error="invalid_token"' : ''}`;
+          res.writeHead(401, { 'www-authenticate': challenge, 'content-type': 'application/json' });
+          res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Sign in to Homing to connect.' }, id: null }));
           return;
         }
-        const info: AuthInfo = { token: '', clientId: principal.agent, scopes: [], extra: { principal } };
+        const info: AuthInfo = { token: token ?? '', clientId: principal.agent, scopes: [], extra: { principal } };
         await mcp(Object.assign(req, { auth: info }) as IncomingMessage & { auth: AuthInfo }, res);
-      } else if (path.startsWith('/api/auth/')) {
-        if (authEndpoints.has(`${req.method} ${path.slice('/api/auth'.length)}`)) await auth(req, res);
+      } else if (path.startsWith('/api/auth/') || path.startsWith('/.well-known/')) {
+        if (authEndpoints.has(`${req.method} ${path}`)) await auth(req, res);
         else res.writeHead(404).end();
       } else if (path.startsWith('/api/')) {
         await handleApi(app, req, res, path);
@@ -78,19 +85,25 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
 
   await new Promise<void>((resolve) => server.listen(options.port, options.host, resolve));
   const url = configured ?? new URL(`http://localhost:${(server.address() as AddressInfo).port}`);
+  if (url.protocol !== 'https:' && !isLocal(url)) {
+    server.close();
+    throw new Error('HOMING_URL must use https, unless it is localhost: passkeys and assistants need it.');
+  }
   const pool = new Pool({ connectionString: options.authDatabase ?? authDatabaseUrl, options: '-c search_path=auth' });
   const homingAuth = createAuth(sql, pool, {
     url,
     secret,
     passwords: process.env.HOMING_PASSWORDS !== 'off',
     rateLimit: options.rateLimit ?? !isLocal(url),
+    fetchClientMetadata: options.fetchClientMetadata,
   });
+  verifyToken = tokenVerifier(homingAuth, pool, url);
 
   mcp = toNodeHandler(createMcpHandler(({ authInfo }) => mcpServer(sql, authInfo?.extra?.principal as AgentPrincipal)));
   auth = authHandler(homingAuth);
   // Refuses requests addressed to other host names, which protects a local install from DNS rebinding.
   validateHost = hostHeaderValidation(isLocal(url) ? localhostAllowedHostnames() : [url.hostname]);
-  app = { sql, auth: homingAuth, url };
+  app = { sql, auth: homingAuth, authPool: pool, url };
 
   return {
     url,

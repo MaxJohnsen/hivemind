@@ -9,6 +9,7 @@ const pages: Record<string, ComponentType> = {
   '/setup': lazy(() => import('@/pages/join').then((page) => ({ default: page.JoinPage }))),
   '/join': lazy(() => import('@/pages/join').then((page) => ({ default: page.JoinPage }))),
   '/account': lazy(() => import('@/pages/account').then((page) => ({ default: page.AccountPage }))),
+  '/connect': lazy(() => import('@/pages/connect').then((page) => ({ default: page.ConnectPage }))),
 };
 
 const Page = import.meta.env.DEV

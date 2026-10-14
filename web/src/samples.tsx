@@ -4,6 +4,7 @@ import { longProposal, proposal, sampleAccount } from '@/sample';
 import { Account } from '@/screens/account';
 import { CardPreview } from '@/screens/card-preview';
 import { Confirm } from '@/screens/confirm';
+import { Connect } from '@/screens/connect';
 import { Join } from '@/screens/join';
 import { SignIn } from '@/screens/sign-in';
 
@@ -22,7 +23,8 @@ const screens: Record<string, { label: string; render: () => ReactNode }> = {
   '/join/expired': { label: 'Invite expired', render: () => <Join state={{ step: 'expired', kind: 'invite' }} /> },
   '/join/signed-in': { label: 'Invite opened while signed in', render: () => <Join state={{ step: 'signed-in', email: 'ana@acme.no' }} /> },
   '/account': { label: 'Your account', render: () => <Account account={sampleAccount} /> },
-  '/account/welcome': { label: 'Your account, just created', render: () => <Account account={{ ...sampleAccount, passkeys: sampleAccount.passkeys.slice(0, 1) }} welcome /> },
+  '/account/welcome': { label: 'Your account, just created', render: () => <Account account={{ ...sampleAccount, passkeys: sampleAccount.passkeys.slice(0, 1), assistants: [] }} welcome /> },
+  '/connect': { label: 'Claude wants to use Homing as you', render: () => <Connect assistant={{ name: 'Claude', site: 'claude.ai' }} person="Ana Berg" /> },
   '/confirm': { label: 'Confirm a rule', render: () => <Confirm proposal={proposal} /> },
   '/confirm/long': { label: 'Confirm a longer rule', render: () => <Confirm proposal={longProposal} /> },
   '/confirm/added': { label: 'Rule added', render: () => <Confirm proposal={proposal} initial="added" /> },

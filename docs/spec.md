@@ -330,7 +330,7 @@ More about the tools:
 - With native integration, Homing learns from conversations automatically unless you say "don't keep this". Otherwise it learns through `remember`. It keeps the knowledge, not the transcript, and background learning never depends on the chat client.
 - Space detection is a suggestion that asks when unsure. Git remotes are hints. There is no hidden "current space".
 - Homing requires no repository structure, local workspace or separate chat app. Prompts and MCP Apps are enhancements.
-- Claude.ai and ChatGPT connect over OAuth to a public HTTPS address, so Homing acts as an authorization server or delegates to an identity provider. An install reachable only locally needs a tunnel to serve them.
+- Every assistant connects over OAuth and acts as the person who signed in and allowed it. A person sees their connected assistants and can disconnect any of them, which takes effect at once. Claude.ai and ChatGPT need a public HTTPS address, so an install reachable only locally needs a tunnel to serve them.
 
 ## 11. Models, distribution and other instances
 

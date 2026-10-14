@@ -41,3 +41,16 @@ export function samePage(next: string | null, origin: string, fallback: string):
     return fallback;
   }
 }
+
+/**
+ * While an assistant is connecting, sign-in and consent carry the signed part
+ * of the page's address, so Homing can continue to the assistant afterward.
+ */
+export function oauthQuery(): { oauth_query?: string } {
+  const params = new URLSearchParams(location.search);
+  if (!params.has('sig')) return {};
+  const names = new Set(params.getAll('ba_param'));
+  const signed = new URLSearchParams();
+  for (const [key, value] of params) if (key === 'sig' || key === 'ba_param' || names.has(key)) signed.append(key, value);
+  return { oauth_query: signed.toString() };
+}
