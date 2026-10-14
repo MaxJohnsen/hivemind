@@ -26,6 +26,7 @@ Chosen for fast context retrieval, simple self-hosting, reliable concurrency and
 | Database | PostgreSQL, the single source of truth |
 | Database access | Plain SQL through postgres.js, with SQL migration files |
 | MCP | The official TypeScript SDK over Streamable HTTP, at `/mcp` |
+| Web app | React, built with Vite, with Tailwind and shadcn/ui. It compiles to static files the server serves; the approval card shown inside assistants compiles to one self-contained HTML file |
 | Search | Postgres full-text search plus `pg_trgm` for names; pgvector only when semantic search is enabled |
 | Queue | Postgres (`SKIP LOCKED`) |
 | Space tree | Plain tables with recursive queries |
@@ -33,6 +34,7 @@ Chosen for fast context retrieval, simple self-hosting, reliable concurrency and
 | Model access | A thin provider layer: Anthropic, OpenAI, or any OpenAI-compatible local endpoint |
 | Deployment | Docker Compose: one Hivemind image plus Postgres. Each release publishes the image for amd64 and arm64 |
 
+- The server code runs without a build step. Only the web app has one, and it runs when the image is built.
 - One image runs every component. A setting chooses its role (everything, MCP and web, or workers), so an installation can be split later without code changes. Heavy parsing runs in worker processes.
 - No Redis, search engine, vector database or graph database. One is added only if a benchmark shows Postgres falls short. For search, the fallback is a ranking extension inside Postgres, such as ParadeDB's `pg_search`, not a new service.
 - Graphile Worker and pgvector are preferred, not committed, until they are tested.
@@ -79,5 +81,4 @@ Hivemind is designed so it could run as a managed service, without building that
 
 ## Open
 
-- Web framework.
 - A built-in OAuth authorization server, or a delegated identity provider.
