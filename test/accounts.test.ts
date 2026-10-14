@@ -43,7 +43,7 @@ describe('a new Homing', () => {
 
     // Only the newest link works, as when the server restarts.
     assert.equal((await browser.json('/api/invite', { token: earlier })).status, 410);
-    assert.deepEqual((await browser.json('/api/invite', { token })).body, { instanceAdmin: true });
+    assert.deepEqual((await browser.json('/api/invite', { token })).body, { instanceAdmin: true, email: null, invitedBy: null });
 
     const joined = await browser.join(token, { name: 'Ana', email: 'Ana@Acme.test' });
     assert.equal(joined.status, 200);
@@ -165,8 +165,9 @@ describe('invites', () => {
 
     const expired = await invite({ expired: true });
     const browser = new Browser(homing.url);
-    assert.equal((await browser.join(expired, { name: 'Dan', email: `dan-${tag()}@acme.test` })).status, 410);
-    assert.equal((await admin`select count(*)::int as n from people where name = 'Dan'`)[0].n, 0);
+    const dan = `Dan ${tag()}`;
+    assert.equal((await browser.join(expired, { name: dan, email: `dan-${tag()}@acme.test` })).status, 410);
+    assert.equal((await admin`select count(*)::int as n from people where name = ${dan}`)[0].n, 0);
   });
 
   test('an invite never leads into an account that already exists', async () => {

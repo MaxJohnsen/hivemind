@@ -1,12 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname } from 'node:path';
+import { isAPIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Pool } from 'pg';
 import { connectedAssistants, disconnectAssistant } from './assistants.ts';
-import { mcpResource, saveTicket, type Auth } from './auth.ts';
+import { joinWithPassword, mcpResource, saveTicket, signedInRecently, type Auth } from './auth.ts';
 import { withPrincipal, type Sql } from './db.ts';
-import { findInvite, newTicket } from './invites.ts';
+import { emails, type Mailer } from './email.ts';
+import { createInvite, findInvite, newTicket } from './invites.ts';
 
 /** What the web app's requests need from the server. */
 export interface App {
@@ -15,7 +17,11 @@ export interface App {
   /** Sign-in's own connection, as homing_auth. */
   authPool: Pool;
   url: URL;
+  /** Sends email, if Homing has a way to. */
+  mailer?: Mailer;
 }
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Homing's own endpoints for its pages. Sign-in itself is Better Auth's, under /api/auth. */
 export async function handleApi(app: App, req: IncomingMessage, res: ServerResponse, path: string): Promise<void> {
@@ -40,18 +46,33 @@ export async function handleApi(app: App, req: IncomingMessage, res: ServerRespo
     if (await app.auth.api.getSession({ headers })) {
       return json(res, 409, { code: 'SIGNED_IN', message: 'Sign out first to create a new account with this invite.' });
     }
-    if (!(await findInvite(app.sql, token))) return json(res, 410, { message: 'This invite has expired or was already used.' });
+    const invite = await findInvite(app.sql, token);
+    if (!invite) return json(res, 410, { message: 'This invite has expired or was already used.' });
     if (!name || name.length > 200) return json(res, 400, { field: 'name', message: 'Enter your name.' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(res, 400, { field: 'email', message: 'Enter an email address, like ana@example.com.' });
+    if (!emailPattern.test(email)) return json(res, 400, { field: 'email', message: 'Enter an email address, like ana@example.com.' });
     const context = await app.auth.$context;
     if (await context.internalAdapter.findUserByEmail(email)) {
       return json(res, 409, { field: 'email', message: 'There is already an account with this email. Sign in instead.' });
     }
-    return json(res, 200, { ticket: await saveTicket(app.auth, newTicket({ token, name, email })) });
+    return json(res, 200, { ticket: await saveTicket(app.auth, newTicket(invite, { token, name, email })) });
+  }
+
+  if (req.method === 'POST' && path === '/api/join/password' && passwords(app)) {
+    const { ticket, password } = await readJson(req);
+    if (typeof ticket !== 'string' || typeof password !== 'string') return json(res, 400, { message: 'Enter a password.' });
+    try {
+      const joined = await joinWithPassword(app.auth, app.authPool, app.sql, ticket, password);
+      const signedIn = await app.auth.api.signInEmail({ body: { email: joined.email, password }, headers, asResponse: true });
+      res.setHeader('set-cookie', signedIn.headers.getSetCookie());
+      return json(res, signedIn.status, {});
+    } catch (error) {
+      return refused(res, error, 'password');
+    }
   }
 
   if (req.method === 'GET' && path === '/api/sign-in-options') {
-    return json(res, 200, { passwords: app.auth.options.emailAndPassword?.enabled ?? false });
+    // Without email, whoever runs Homing gives people a sign-in link when they need one.
+    return json(res, 200, { passwords: passwords(app), recovery: app.mailer ? 'email' : 'operator' });
   }
 
   if (req.method === 'GET' && path === '/api/me') {
@@ -61,14 +82,58 @@ export async function handleApi(app: App, req: IncomingMessage, res: ServerRespo
       select name, instance_admin from people where id = ${session.user.id}::uuid
     `);
     const passkeys = await app.auth.api.listPasskeys({ headers });
+    const accounts = await app.auth.api.listUserAccounts({ headers });
     return json(res, 200, {
       name: person?.name ?? session.user.name,
       email: session.user.email,
+      emailVerified: session.user.emailVerified,
+      canEmail: Boolean(app.mailer),
       instanceAdmin: person?.instanceAdmin ?? false,
+      passwords: passwords(app),
+      password: accounts.some((account) => account.providerId === 'credential'),
       passkeys: passkeys.map(({ id, name, createdAt }) => ({ id, name: name ?? null, createdAt })),
       assistants: await connectedAssistants(app.authPool, session.user.id),
       mcpUrl: mcpResource(app.url),
     });
+  }
+
+  if (req.method === 'POST' && path === '/api/account/password' && passwords(app)) {
+    const session = await app.auth.api.getSession({ headers });
+    if (!session) return json(res, 401, { message: 'Sign in first.' });
+    const [person] = await withPrincipal(app.sql, { person: session.user.id }, ({ tx }) => tx<{ instanceAdmin: boolean }[]>`
+      select instance_admin from people where id = ${session.user.id}::uuid
+    `);
+    if (person?.instanceAdmin) {
+      return json(res, 403, { message: 'The account that looks after Homing signs in only with passkeys.' });
+    }
+    if (!signedInRecently(session.session)) return json(res, 403, { code: 'SIGN_IN_AGAIN', message: 'Sign in again first.' });
+    const { password } = await readJson(req);
+    if (typeof password !== 'string') return json(res, 400, { field: 'password', message: 'Enter a password.' });
+    try {
+      await app.auth.api.setPassword({ body: { newPassword: password }, headers });
+      return json(res, 200, {});
+    } catch (error) {
+      return refused(res, error, 'password');
+    }
+  }
+
+  if (req.method === 'POST' && path === '/api/invites') {
+    const session = await app.auth.api.getSession({ headers });
+    if (!session) return json(res, 401, { message: 'Sign in first.' });
+    const { email } = await readJson(req);
+    const address = typeof email === 'string' && email.trim() ? email.trim().toLowerCase() : undefined;
+    if (address && !emailPattern.test(address)) return json(res, 400, { field: 'email', message: 'Enter an email address, like ana@example.com.' });
+    if (address && !app.mailer) return json(res, 400, { field: 'email', message: 'Homing can’t send email. Copy the link instead.' });
+    try {
+      const invite = await withPrincipal(app.sql, { person: session.user.id, direct: true }, (s) => createInvite(s, app.url, address));
+      if (address) await app.mailer!(emails.invite(address, invite.link, session.user.name));
+      return json(res, 200, { ...invite, emailed: Boolean(address) });
+    } catch (error) {
+      if ((error as { code?: string }).code === '42501') {
+        return json(res, 403, { message: 'Only the person who looks after Homing invites people.' });
+      }
+      throw error;
+    }
   }
 
   if (req.method === 'POST' && path === '/api/assistants/disconnect') {
@@ -87,7 +152,7 @@ export async function handleApi(app: App, req: IncomingMessage, res: ServerRespo
 const dist = new URL('../web/dist/app/', import.meta.url);
 
 /** The pages of the web app. Each one loads the same single-page app. */
-const pages = new Set(['/sign-in', '/setup', '/join', '/account', '/connect']);
+const pages = new Set(['/sign-in', '/setup', '/join', '/account', '/connect', '/recover']);
 
 const types: Record<string, string> = {
   '.js': 'text/javascript; charset=utf-8',
@@ -142,6 +207,21 @@ export async function serveApp(app: App, req: IncomingMessage, res: ServerRespon
     });
   }
   res.end(req.method === 'HEAD' ? undefined : body);
+}
+
+function passwords(app: App): boolean {
+  return app.auth.options.emailAndPassword?.enabled ?? false;
+}
+
+/** Answers with sign-in's own refusal, such as a password that's too short. */
+function refused(res: ServerResponse, error: unknown, field?: string): void {
+  if (!isAPIError(error)) throw error;
+  const body = error.body as { code?: string; message?: string } | undefined;
+  json(res, error.statusCode, {
+    code: body?.code,
+    message: body?.message ?? 'That didn’t work. Try again.',
+    field: body?.code?.startsWith('PASSWORD') ? field : undefined,
+  });
 }
 
 function json(res: ServerResponse, status: number, body: unknown): void {

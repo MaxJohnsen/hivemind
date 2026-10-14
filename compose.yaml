@@ -40,6 +40,9 @@ services:
       HOMING_SECRET: ${HOMING_SECRET:-}
       HOMING_TRUSTED_PROXIES: ${HOMING_TRUSTED_PROXIES:-}
       HOMING_ASSISTANT_SITES: ${HOMING_ASSISTANT_SITES:-}
+      # Optional: lets Homing send invites and sign-in links by email.
+      SMTP_URL: ${SMTP_URL:-}
+      HOMING_EMAIL_FROM: ${HOMING_EMAIL_FROM:-}
     ports:
       - "127.0.0.1:${HOMING_PORT:-4100}:4100"
     depends_on:

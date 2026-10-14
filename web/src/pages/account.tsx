@@ -2,11 +2,15 @@ import { useEffect, useState } from 'react';
 import { WebAuthnError } from '@simplewebauthn/browser';
 import { api, ApiError } from '@/lib/api';
 import { cancelled, createPasskey } from '@/lib/passkeys';
-import { Account, signInAgainMessage, type AccountData } from '@/screens/account';
+import { Account, signInAgainMessage, type AccountData, type AccountNotice } from '@/screens/account';
 
 export function AccountPage() {
   const [account, setAccount] = useState<AccountData>();
-  const [welcome] = useState(() => new URLSearchParams(location.search).has('welcome'));
+  // Shown once, after joining, recovering or verifying an email, and not again after a reload.
+  const [notice] = useState<AccountNotice | undefined>(() => {
+    const params = new URLSearchParams(location.search);
+    return (['welcome', 'recovered', 'verified'] as const).find((name) => params.has(name));
+  });
 
   const load = () =>
     api<AccountData>('/api/me').then(setAccount, (error) => {
@@ -14,17 +18,16 @@ export function AccountPage() {
     });
 
   useEffect(() => {
-    // The welcome shows once, not again after a reload.
-    if (welcome) history.replaceState(null, '', '/account');
+    if (notice) history.replaceState(null, '', '/account');
     load();
-  }, [welcome]);
+  }, [notice]);
 
   if (!account) return null;
 
   return (
     <Account
       account={account}
-      welcome={welcome}
+      notice={notice}
       actions={{
         async disconnect(clientId) {
           try {
@@ -53,6 +56,31 @@ export function AccountPage() {
             await load();
           } catch (error) {
             return error instanceof Error ? error.message : 'Something went wrong. Try again.';
+          }
+        },
+        async setPassword(password, current) {
+          try {
+            if (current === undefined) await api('/api/account/password', { password });
+            else await api('/api/auth/change-password', { newPassword: password, currentPassword: current });
+            await load();
+          } catch (error) {
+            if (error instanceof ApiError && ['SIGN_IN_AGAIN', 'SESSION_NOT_FRESH'].includes(error.code ?? '')) return signInAgainMessage;
+            if (error instanceof ApiError && error.code === 'INVALID_PASSWORD') return "That's not your current password.";
+            return error instanceof Error ? error.message : 'Something went wrong. Try again.';
+          }
+        },
+        async verifyEmail() {
+          try {
+            await api('/api/auth/send-verification-email', { email: account.email, callbackURL: '/account?verified' });
+          } catch (error) {
+            return error instanceof Error ? error.message : 'Something went wrong. Try again.';
+          }
+        },
+        async invite(email) {
+          try {
+            return await api<{ link: string; expiresAt: string; emailed: boolean }>('/api/invites', { email });
+          } catch (error) {
+            return { problem: error instanceof Error ? error.message : 'Something went wrong. Try again.' };
           }
         },
         async signInAgain() {

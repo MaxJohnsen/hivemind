@@ -31,6 +31,14 @@ Open the link to create your account with a passkey. It works once, for an hour;
 | `HOMING_PASSWORDS` | `off` turns off signing in with a password. Passkeys always work |
 | `HOMING_TRUSTED_PROXIES` | The reverse proxies in front of Homing, as addresses or ranges like `172.16.0.0/12`. Only their `X-Forwarded-For` counts for sign-in's rate limits; otherwise Homing uses the connection's own address |
 | `HOMING_ASSISTANT_SITES` | The sites whose assistants may connect, by the host of their client metadata document. Defaults to `claude.ai,chatgpt.com`; `*` allows any |
+| `SMTP_URL` | Optional, for sending email, such as `smtps://user:password@smtp.example.com`. Without it, Homing never sends email |
+| `HOMING_EMAIL_FROM` | Who Homing's email comes from, such as `Homing <homing@example.com>` |
+
+Your account page invites people. If someone can't sign in and Homing has no email, give them a one-time sign-in link:
+
+```sh
+docker compose exec homing node src/cli.ts sign-in-link ana@example.com
+```
 
 ### Trying it with Claude Code
 

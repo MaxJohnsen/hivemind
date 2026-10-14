@@ -27,7 +27,7 @@ export function as<T>(principal: Principal, fn: (s: Session) => Promise<T>, sql 
  * own people, so tests never see each other's data.
  */
 export async function person(name: string) {
-  const { id, personalSpaceId } = await createPerson(db, name);
+  const { id, personalSpaceId } = await createPerson(admin, name);
   return { name, id, personalSpaceId, person: id };
 }
 
