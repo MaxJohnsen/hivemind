@@ -45,6 +45,10 @@ describe('a new Homing', () => {
     assert.equal((await browser.json('/api/invite', { token: earlier })).status, 410);
     assert.deepEqual((await browser.json('/api/invite', { token })).body, { instanceAdmin: true, email: null, invitedBy: null });
 
+    // The first account signs in only with passkeys, even when asked for a password.
+    const ticket = (await browser.json('/api/join', { token, name: 'Ana', email: 'ana@acme.test' })).body.ticket;
+    assert.equal((await browser.json('/api/join/password', { ticket, password: 'correct horse battery' })).status, 403);
+
     const joined = await browser.join(token, { name: 'Ana', email: 'Ana@Acme.test' });
     assert.equal(joined.status, 200);
     const me = await browser.json('/api/me');

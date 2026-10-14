@@ -54,6 +54,8 @@ export interface Ticket {
   email: string;
   /** Whether the invite went to this email, which proves it's theirs. */
   emailVerified: boolean;
+  /** Whether the account becomes the instance admin, which signs in only with passkeys. */
+  instanceAdmin: boolean;
 }
 
 export function newTicket(invite: Invite, input: { token: string; name: string; email: string }): Ticket {
@@ -63,6 +65,7 @@ export function newTicket(invite: Invite, input: { token: string; name: string; 
     name: input.name,
     email: input.email,
     emailVerified: invite.email === input.email,
+    instanceAdmin: invite.instanceAdmin,
   };
 }
 

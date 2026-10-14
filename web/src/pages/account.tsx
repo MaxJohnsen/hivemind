@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { WebAuthnError } from '@simplewebauthn/browser';
 import { api, ApiError } from '@/lib/api';
 import { cancelled, createPasskey } from '@/lib/passkeys';
-import { Account, signInAgainMessage, type AccountData, type AccountNotice } from '@/screens/account';
+import { Account, signInAgainMessage, type AccountData, type AccountNotice, type InviteMade } from '@/screens/account';
 
 export function AccountPage() {
   const [account, setAccount] = useState<AccountData>();
@@ -78,7 +78,7 @@ export function AccountPage() {
         },
         async invite(email) {
           try {
-            return await api<{ link: string; expiresAt: string; emailed: boolean }>('/api/invites', { email });
+            return await api<InviteMade>('/api/invites', { email });
           } catch (error) {
             return { problem: error instanceof Error ? error.message : 'Something went wrong. Try again.' };
           }

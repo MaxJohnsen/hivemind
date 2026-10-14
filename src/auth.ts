@@ -10,6 +10,7 @@ import type { Pool } from 'pg';
 import type { Sql } from './db.ts';
 import { emails, type Mailer } from './email.ts';
 import { acceptInvite, type Ticket } from './invites.ts';
+import { operatorLinks } from './recovery.ts';
 
 export interface AuthSettings {
   /** Where Homing is reached. Passkeys belong to its host name. */
@@ -33,11 +34,6 @@ export interface AuthSettings {
   assistantSites: string[];
   /** Sends email, if Homing has a way to. */
   mailer?: Mailer;
-  /**
-   * For whoever runs the server: receives sign-in links for anyone, instead
-   * of email only going to verified addresses. Only the command line sets it.
-   */
-  operatorLinks?: (link: string) => void;
 }
 
 /** Where the server puts the address a request comes from, for sign-in's rate limits. */
@@ -164,18 +160,22 @@ export function createAuth(sql: Sql, pool: Pool, settings: AuthSettings) {
         isMetadataDocumentUrlAllowed: (clientId) =>
           settings.assistantSites.includes('*') || settings.assistantSites.includes(new URL(clientId).hostname),
       }),
-      // Recovery: a one-time sign-in link, by email only to a verified address,
-      // or from whoever runs the server. It never creates an account.
+      // Recovery: a one-time sign-in link by email, only to a verified address.
+      // It never creates an account. The answer doesn't wait for the email, so
+      // how long it takes says nothing about the address.
       magicLink({
         disableSignUp: true,
-        expiresIn: settings.operatorLinks ? 60 * 60 : 15 * 60,
+        expiresIn: 15 * 60,
         storeToken: 'hashed',
         sendMagicLink: async ({ email, url }, ctx) => {
-          if (settings.operatorLinks) return settings.operatorLinks(url);
           const user = await ctx?.context.internalAdapter.findUserByEmail(email);
-          if (settings.mailer && user?.user.emailVerified) await settings.mailer(emails.signIn(user.user.email, url));
+          if (settings.mailer && user?.user.emailVerified) {
+            settings.mailer(emails.signIn(user.user.email, url)).catch((error) => console.error('Sending a sign-in link failed', error));
+          }
         },
       }),
+      // Or from whoever runs the server, when there's no email.
+      operatorLinks(),
     ],
   });
 }
@@ -223,11 +223,15 @@ export async function joinWithPassword(auth: Auth, pool: Pool, sql: Sql, ticketI
   const context = await auth.$context;
   const ticket = await findTicket(context.internalAdapter, ticketId);
   if (!ticket) throw expired();
+  // The account that looks after Homing signs in only with passkeys.
+  if (ticket.instanceAdmin) {
+    throw APIError.from('FORBIDDEN', { code: 'PASSKEY_ONLY', message: 'The first account signs in only with a passkey.' });
+  }
   const { minPasswordLength, maxPasswordLength } = auth.options.emailAndPassword;
   if (password.length < minPasswordLength || password.length > maxPasswordLength) {
     throw APIError.from('BAD_REQUEST', {
       code: 'PASSWORD_LENGTH',
-      message: `Use a password of at least ${minPasswordLength} characters.`,
+      message: `Use a password of ${minPasswordLength} to ${maxPasswordLength} characters.`,
     });
   }
   const hash = await context.password.hash(password);
@@ -288,6 +292,7 @@ export const authEndpoints = new Set([
   // Recovery and verifying an email address.
   'POST /api/auth/sign-in/magic-link',
   'GET /api/auth/magic-link/verify',
+  'GET /api/auth/sign-in/operator-link',
   'POST /api/auth/send-verification-email',
   'GET /api/auth/verify-email',
   // Assistants find out how to connect, sign the person in and get tokens.

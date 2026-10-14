@@ -42,10 +42,13 @@ export interface AccountActions {
   removePasskey(id: string): Promise<string | undefined>;
   setPassword(password: string, current?: string): Promise<string | undefined>;
   verifyEmail(): Promise<string | undefined>;
-  invite(email?: string): Promise<{ link: string; expiresAt: string; emailed: boolean } | { problem: string }>;
+  invite(email?: string): Promise<InviteMade | { problem: string }>;
   signInAgain(): Promise<void>;
   signOut(): Promise<void>;
 }
+
+/** An invite just made: a link to share, or sent by email straight to the person. */
+export type InviteMade = { link: string; expiresAt: string; emailed: false } | { to: string; expiresAt: string; emailed: true };
 
 /** Shown once, after something that brought you here. */
 export type AccountNotice = 'welcome' | 'recovered' | 'verified';
@@ -350,7 +353,7 @@ function Password({ account, actions }: { account: AccountData; actions?: Accoun
 
 function Invite({ account, actions }: { account: AccountData; actions?: AccountActions }) {
   const [email, setEmail] = useState('');
-  const [invite, setInvite] = useState<{ link: string; expiresAt: string; emailed: boolean }>();
+  const [invite, setInvite] = useState<InviteMade>();
   const [message, setMessage] = useState<string>();
   const [busy, setBusy] = useState(false);
 
@@ -377,12 +380,15 @@ function Invite({ account, actions }: { account: AccountData; actions?: AccountA
         </p>
       </div>
 
-      {invite && (
-        <div className="flex flex-col gap-2" role="status">
-          <p className="text-[15px]">{invite.emailed ? 'Sent. You can also share the link yourself:' : 'Share this link with them:'}</p>
-          <CopyAddress value={invite.link} />
-        </div>
-      )}
+      {invite &&
+        (invite.emailed ? (
+          <p className="text-[15px]" role="status">Sent to {invite.to}. The link goes only to them.</p>
+        ) : (
+          <div className="flex flex-col gap-2" role="status">
+            <p className="text-[15px]">Share this link with them:</p>
+            <CopyAddress value={invite.link} />
+          </div>
+        ))}
 
       <form className="flex flex-col gap-4" onSubmit={create} noValidate>
         {account.canEmail && (

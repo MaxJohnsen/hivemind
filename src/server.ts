@@ -31,6 +31,8 @@ export interface ServerOptions {
   assistantSites?: string[];
   /** Sends email. By default from SMTP_URL, if it's set. */
   mailer?: Mailer;
+  /** Whether people may sign in with a password. On unless HOMING_PASSWORDS is off. */
+  passwords?: boolean;
 }
 
 export interface Homing {
@@ -99,7 +101,7 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
   const homingAuth = createAuth(sql, pool, {
     url,
     secret,
-    passwords: process.env.HOMING_PASSWORDS !== 'off',
+    passwords: options.passwords ?? process.env.HOMING_PASSWORDS !== 'off',
     rateLimit: options.rateLimit ?? !isLocal(url),
     fetchClientMetadata: options.fetchClientMetadata,
     assistantSites: options.assistantSites ?? assistantSites,

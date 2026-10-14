@@ -6,7 +6,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
-import { Pool } from 'pg';
 import { authDatabaseUrl } from '../src/db.ts';
 import type { Email } from '../src/email.ts';
 import { createInvite } from '../src/invites.ts';
@@ -18,13 +17,18 @@ import { inTestDatabase } from './reset.ts';
 
 let homing: Homing;
 const outbox: Email[] = [];
+/** While set, sending email waits for it. */
+let stalled: Promise<void> | undefined;
 
 before(async () => {
   homing = await startServer(db, {
     port: 0,
     host: '127.0.0.1',
     authDatabase: inTestDatabase(authDatabaseUrl),
-    mailer: async (email) => void outbox.push(email),
+    mailer: async (email) => {
+      await stalled;
+      outbox.push(email);
+    },
   });
 });
 
@@ -90,7 +94,9 @@ describe('inviting people', () => {
   test('an invite sent by email verifies the address it is accepted with', async () => {
     const ida = await instanceAdmin();
     const cara = `cara-${tag()}@acme.test`;
-    assert.equal((await ida.browser.json('/api/invites', { email: cara })).body.emailed, true);
+    const sent = await ida.browser.json('/api/invites', { email: cara });
+    // The link goes only to that address, so the sender can't use it to claim it.
+    assert.deepEqual([sent.body.emailed, sent.body.link], [true, undefined]);
     const token = tokenOf(linkIn(mailTo(cara))!);
     assert.equal((await new Browser(homing.url).json('/api/invite', { token })).body.email, cara);
     const joined = await new Browser(homing.url).join(token, { name: 'Cara', email: cara });
@@ -146,23 +152,53 @@ describe('getting back in', () => {
     assert.equal((await again.json('/api/me')).status, 401);
   });
 
-  test('whoever runs the server can give someone a sign-in link', async () => {
-    const dan = await member(homing.url, 'Dan');
-    const pool = new Pool({ connectionString: inTestDatabase(authDatabaseUrl), options: '-c search_path=auth' });
+  test('whoever runs the server can give someone a sign-in link, which changes nothing else', async () => {
+    const ida = await instanceAdmin();
+    const ben = new Browser(homing.url);
+    const email = `ben-${tag()}@beta.test`;
+    const { body } = await ben.json('/api/join', { token: tokenOf((await ida.browser.json('/api/invites', {})).body.link), name: 'Ben', email });
+    await ben.json('/api/join/password', { ticket: body.ticket, password: 'correct horse battery' });
+
+    const link = new URL((await operatorSignInLink(homing.auth, homing.url, email.toUpperCase()))!);
+    const lost = new Browser(homing.url);
+    const used = await lost.fetch(link.pathname + link.search);
+    assert.equal(new URL(used.headers.get('location')!, homing.url).pathname, '/account');
+    const me = (await lost.json('/api/me')).body;
+    assert.equal(me.name, 'Ben');
+    // It says nothing about who owns the address, so the address stays unverified,
+    // the password stays, and Ben's other sessions go on.
+    assert.equal(me.emailVerified, false);
+    assert.equal(me.password, true);
+    assert.equal((await ben.json('/api/me')).status, 200);
+
+    // It works once.
+    const again = new Browser(homing.url);
+    await again.fetch(link.pathname + link.search);
+    assert.equal((await again.json('/api/me')).status, 401);
+    assert.equal(await operatorSignInLink(homing.auth, homing.url, `nobody-${tag()}@acme.test`), undefined);
+  });
+
+  test('asking for a sign-in link takes no longer for a verified address', { timeout: 5000 }, async () => {
+    const ida = await instanceAdmin();
+    const address = `cara-${tag()}@acme.test`;
+    await ida.browser.json('/api/invites', { email: address });
+    await new Browser(homing.url).join(tokenOf(linkIn(mailTo(address))!), { name: 'Cara', email: address });
+    // Sending stalls; the answer comes anyway, without waiting for it.
+    let release = () => {};
+    stalled = new Promise<void>((resolve) => (release = resolve));
     try {
-      const link = new URL((await operatorSignInLink(db, pool, { url: homing.url, secret: 'x'.repeat(40) }, dan.email.toUpperCase()))!);
-      const lost = new Browser(homing.url);
-      await lost.fetch(link.pathname + link.search);
-      assert.equal((await lost.json('/api/me')).body.name, 'Dan');
-      assert.equal(await operatorSignInLink(db, pool, { url: homing.url, secret: 'x'.repeat(40) }, `nobody-${tag()}@acme.test`), undefined);
+      const answer = await new Browser(homing.url).json('/api/auth/sign-in/magic-link', { email: address, callbackURL: '/account?recovered' });
+      assert.equal(answer.status, 200);
     } finally {
-      await pool.end();
+      release();
+      stalled = undefined;
     }
   });
 
   test('you verify your own email, and nobody else’s', async () => {
     const dan = await member(homing.url, 'Dan');
     const cara = await member(homing.url, 'Cara');
+    assert.equal((await new Browser(homing.url).json('/api/auth/send-verification-email', { email: cara.email })).status, 401);
     assert.equal((await dan.browser.json('/api/auth/send-verification-email', { email: cara.email })).status, 401);
     assert.equal(mailTo(cara.email), undefined);
 
@@ -171,4 +207,17 @@ describe('getting back in', () => {
     await dan.browser.fetch(link.pathname + link.search);
     assert.equal((await dan.browser.json('/api/me')).body.emailVerified, true);
   });
+});
+
+test('with passwords off, nobody joins with one', async () => {
+  const strict = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase: inTestDatabase(authDatabaseUrl), mailer: undefined, passwords: false });
+  try {
+    const ida = await member(strict.url, 'Ida');
+    await admin`update people set instance_admin = true where id = ${ida.id}`;
+    const browser = new Browser(strict.url);
+    const { body } = await browser.json('/api/join', { token: tokenOf((await ida.browser.json('/api/invites', {})).body.link), name: 'Ben', email: `ben-${tag()}@beta.test` });
+    assert.equal((await browser.json('/api/join/password', { ticket: body.ticket, password: 'correct horse battery' })).status, 404);
+  } finally {
+    await strict.close();
+  }
 });

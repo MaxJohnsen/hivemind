@@ -21,7 +21,8 @@ export interface App {
   mailer?: Mailer;
 }
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// One plain address, nothing a mail program could read as a name and another address.
+const emailPattern = /^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\]\\,;:"]+$/;
 
 /** Homing's own endpoints for its pages. Sign-in itself is Better Auth's, under /api/auth. */
 export async function handleApi(app: App, req: IncomingMessage, res: ServerResponse, path: string): Promise<void> {
@@ -126,8 +127,11 @@ export async function handleApi(app: App, req: IncomingMessage, res: ServerRespo
     if (address && !app.mailer) return json(res, 400, { field: 'email', message: 'Homing can’t send email. Copy the link instead.' });
     try {
       const invite = await withPrincipal(app.sql, { person: session.user.id, direct: true }, (s) => createInvite(s, app.url, address));
-      if (address) await app.mailer!(emails.invite(address, invite.link, session.user.name));
-      return json(res, 200, { ...invite, emailed: Boolean(address) });
+      if (!address) return json(res, 200, { ...invite, emailed: false });
+      // An emailed invite verifies the address it is accepted with, so its link
+      // goes only to that address, not to whoever sent it.
+      await app.mailer!(emails.invite(address, invite.link, session.user.name));
+      return json(res, 200, { expiresAt: invite.expiresAt, emailed: true, to: address });
     } catch (error) {
       if ((error as { code?: string }).code === '42501') {
         return json(res, 403, { message: 'Only the person who looks after Homing invites people.' });
