@@ -11,6 +11,7 @@ docker compose up -d db   # PostgreSQL on port 5442
 npm install
 npm run check             # type checking
 npm test                  # recreates the test database and runs the tests
+npm run dev:web           # the screens, with sample data, at http://localhost:5173
 ```
 
 ### Trying it with Claude Code

@@ -1,0 +1,51 @@
+@import "tailwindcss";
+@import "./theme.css";
+
+/* The card lives inside Claude or ChatGPT, so it takes the host's colors, font and corners
+   when the host provides them, and falls back to Soft. The host sets --font-sans itself.
+   Sage stays for the main action. */
+:root {
+  --radius: var(--border-radius-lg, 0.875rem);
+
+  --background: var(--color-background-primary, #fffdf9);
+  --foreground: var(--color-text-primary, #2b2824);
+  --card: var(--color-background-primary, #fffdf9);
+  --card-foreground: var(--color-text-primary, #2b2824);
+  --popover: var(--color-background-primary, #fffdf9);
+  --popover-foreground: var(--color-text-primary, #2b2824);
+  --primary: #4f6f58;
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-background-secondary, #efeae2);
+  --secondary-foreground: var(--color-text-primary, #2b2824);
+  --muted: var(--color-background-secondary, #efeae2);
+  --muted-foreground: var(--color-text-secondary, #716a61);
+  --accent: var(--color-background-secondary, #eef3ec);
+  --accent-foreground: var(--color-text-primary, #2b2824);
+  --destructive: #a8432c;
+  --border: var(--color-border-primary, #e7e0d5);
+  --input: var(--color-border-secondary, #9b9083);
+  --ring: #4f6f58;
+
+  --private: #f8e3d8;
+  --private-foreground: #864530;
+  --change: color-mix(in oklab, #4f6f58 12%, var(--background));
+  --wash: #e9a98f;
+}
+
+/* In a dark host, sage gets lighter and a little more saturated so the main action stands out,
+   and the change block darkens with the host. */
+:root[data-theme="dark"] {
+  --primary: #8fc29c;
+  --primary-foreground: #0f1d14;
+  --ring: #8fc29c;
+  --private: #4a2c22;
+  --private-foreground: #f3c7b3;
+  color-scheme: dark;
+}
+
+/* The host draws the conversation behind the card. */
+@layer base {
+  body {
+    background: transparent;
+  }
+}

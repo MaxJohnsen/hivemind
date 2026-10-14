@@ -10,6 +10,7 @@ Hivemind is being designed and built in the open. The documents describe it, and
 - `docs/concept.md` explains the idea in plain language, without technology.
 - `docs/spec.md` defines the behavior and guarantees, without technology.
 - `docs/architecture.md` describes how Hivemind is built.
+- `docs/design.md` describes how its screens look and behave.
 
 Keep that separation. Implementation details never go in the concept or the spec.
 
@@ -34,7 +35,7 @@ This repository should read as if people wrote it for people.
 - Each pull request says what changed, why, and how it was tested.
 - The cross-client leak test (guarantee 2) runs on every change. `npm run check` and `npm test` must pass; the tests need the database from `docker compose up -d db`.
 - A new table holding space data gets row-level security under the same access rule, and the leak test covers it.
-- Agree on UI design, component library and guidelines with the maintainer before building any screen people use.
+- Every screen follows `docs/design.md`. Agree on a new kind of screen with the maintainer before building it.
 - The plan can change. If using Hivemind shows a better order, adapt.
 
 ## How we test

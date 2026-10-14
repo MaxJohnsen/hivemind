@@ -17,4 +17,5 @@ jobs:
       - run: docker compose up -d --wait db
       - run: npm ci
       - run: npm run check
+      - run: npm run build:web
       - run: npm test

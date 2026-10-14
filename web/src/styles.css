@@ -1,0 +1,37 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/figtree";
+@import "./theme.css";
+
+@theme {
+  --font-sans: "Figtree Variable", "Figtree", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Soft: linen backgrounds, sage for actions, peach for what's only yours. Light only for now. */
+:root {
+  --radius: 0.875rem;
+
+  --background: #f6f3ee; /* linen */
+  --foreground: #2b2824; /* ink */
+  --card: #fffdf9;
+  --card-foreground: #2b2824;
+  --popover: #fffdf9;
+  --popover-foreground: #2b2824;
+  --primary: #4f6f58; /* sage: every main action */
+  --primary-foreground: #ffffff;
+  --secondary: #efeae2;
+  --secondary-foreground: #2b2824;
+  --muted: #efeae2;
+  --muted-foreground: #716a61;
+  --accent: #eef3ec;
+  --accent-foreground: #2b2824;
+  --destructive: #a8432c;
+  --border: #e7e0d5; /* dividers and card edges */
+  --input: #9b9083; /* field and checkbox edges, 3:1 against the card */
+  --ring: #4f6f58;
+
+  --private: #f8e3d8; /* "Only you", always with its label */
+  --private-foreground: #864530;
+  --change: #eef3ec; /* the exact change someone is deciding on */
+  --wash: #e9a98f; /* peach, for small accents such as the wordmark dot */
+}
