@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { KeyRound } from 'lucide-react';
-import { LandingBird } from '@/components/landing-bird';
 import { GoogleLogo, MicrosoftLogo } from '@/components/provider-logos';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Wordmark } from '@/components/wordmark';
+import bird from '@/assets/illustrations/bird.jpg';
 import scene from '@/assets/illustrations/signin.jpg';
 
 export type SignInStep = 'email' | 'passkey' | 'password' | 'wrong';
@@ -29,7 +29,7 @@ export function SignIn({ connecting, initial = 'email' }: { connecting?: string;
         <Wordmark className="text-lg" />
         <main className="flex flex-1 items-start pt-10 pb-10 sm:items-center">
           <div className="relative mx-auto flex w-full max-w-sm flex-col gap-7 rounded-2xl border bg-card p-6 sm:p-8">
-            <LandingBird />
+            <img src={bird} alt="" width={300} height={250} className="illustration pointer-events-none absolute right-6 -top-[71px] w-24" />
             <div className="flex flex-col gap-1.5">
               <h1 className="text-[28px] leading-tight font-semibold tracking-tight">
                 {connecting ? `Sign in to connect ${connecting}` : 'Sign in to Hivemind'}

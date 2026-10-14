@@ -41,37 +41,3 @@
   mix-blend-mode: multiply;
 }
 
-/* The paper bird. In flight its wings beat around the shoulder and its legs tuck in. */
-.paper-bird .near-wing,
-.paper-bird .far-wing,
-.paper-bird .legs {
-  transform-box: view-box;
-  transition: transform 0.35s ease, opacity 0.25s ease;
-}
-.paper-bird .near-wing {
-  transform-origin: 54px 50px;
-}
-.paper-bird .far-wing {
-  transform-origin: 62px 49px;
-}
-.paper-bird .legs {
-  transform-origin: 45px 60px;
-}
-.paper-bird[data-pose="flying"] .near-wing {
-  animation: bird-wing 0.36s ease-in-out infinite alternate;
-}
-.paper-bird[data-pose="flying"] .far-wing {
-  animation: bird-wing 0.36s ease-in-out 0.06s infinite alternate;
-}
-.paper-bird[data-pose="flying"] .legs {
-  transform: scaleY(0.2);
-  opacity: 0;
-}
-@keyframes bird-wing {
-  from {
-    transform: scaleY(1.05) rotate(-6deg);
-  }
-  to {
-    transform: scaleY(-0.65) rotate(10deg);
-  }
-}

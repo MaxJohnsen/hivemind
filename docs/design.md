@@ -75,7 +75,7 @@ The bird always looks like its character sheet, [`docs/design/paper-bird.jpg`](d
 
 > Soft colored-pencil drawing with gentle visible pencil texture, rounded friendly shapes, a muted pastel palette of sage green, soft peach and warm gray, light and airy. Plenty of empty space, nothing cropped. Pure flat white background. No text, no logos, no screens.
 
-On the sign-in page the bird is also drawn as flat folds, so its wings can move: it flies in and lands on the sign-in card, once per visit. With reduced motion it is simply there.
+On the sign-in page the bird sits on the edge of the sign-in card.
 
 ## The approval card
 

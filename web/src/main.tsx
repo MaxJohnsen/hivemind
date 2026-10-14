@@ -1,6 +1,5 @@
 import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PaperBird } from '@/components/paper-bird';
 import { Wordmark } from '@/components/wordmark';
 import { longProposal, proposal } from '@/sample';
 import { CardPreview } from '@/screens/card-preview';
@@ -19,16 +18,6 @@ const screens: Record<string, { label: string; render: () => ReactNode }> = {
   '/confirm/long': { label: 'Confirm a longer rule', render: () => <Confirm proposal={longProposal} /> },
   '/confirm/added': { label: 'Rule added', render: () => <Confirm proposal={proposal} initial="added" /> },
   '/confirm/declined': { label: 'Rule not added', render: () => <Confirm proposal={proposal} initial="declined" /> },
-  '/bird': {
-    label: 'The paper bird, standing and flying',
-    render: () => (
-      <main className="mx-auto flex max-w-3xl flex-wrap items-end justify-center gap-16 px-4 py-16">
-        <PaperBird className="w-72" />
-        <PaperBird pose="flying" className="w-72" />
-        <PaperBird className="w-16" />
-      </main>
-    ),
-  },
   '/card-preview': { label: 'Approval card in Claude and ChatGPT', render: () => <CardPreview /> },
   '/card-preview/long': { label: 'Approval card with a longer rule', render: () => <CardPreview sample="long" /> },
 };
