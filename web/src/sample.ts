@@ -1,3 +1,4 @@
+import type { AccountData } from '@/screens/account';
 import type { RuleKind } from '@/components/proposed-change';
 
 // Sample data until #4 connects these screens to real proposals.
@@ -36,4 +37,15 @@ export const longProposal: Proposal = {
     'Write them in Norwegian, keep them under one page, and send them to Gunnar before 15:00 on Fridays.',
   ].join('\n'),
   precedence: 'Requirements always apply. If two requirements conflict, the assistant stops and tells you.',
+};
+
+// Ana's account, with a passkey on her laptop and one on her phone.
+export const sampleAccount: AccountData = {
+  name: 'Ana Berg',
+  email: 'ana@acme.no',
+  instanceAdmin: false,
+  passkeys: [
+    { id: 'mac', name: 'Mac', createdAt: '2026-10-14T09:12:00Z' },
+    { id: 'iphone', name: 'iPhone', createdAt: '2026-10-15T18:40:00Z' },
+  ],
 };

@@ -26,6 +26,7 @@ Chosen for fast context retrieval, simple self-hosting, reliable concurrency and
 | Database | PostgreSQL, the single source of truth |
 | Database access | Plain SQL through postgres.js, with SQL migration files |
 | MCP | The official TypeScript SDK over Streamable HTTP, at `/mcp` |
+| Sign-in | [Better Auth](https://better-auth.com), built in: passkeys and passwords for people, and OAuth for assistants. Only the plugins Homing uses are on, and the server answers only the endpoints its pages use |
 | Web app | React, built with Vite, with Tailwind and shadcn/ui. It compiles to static files the server serves; the approval card shown inside assistants compiles to one self-contained HTML file |
 | Search | Postgres full-text search plus `pg_trgm` for names; pgvector only when semantic search is enabled |
 | Queue | Postgres (`SKIP LOCKED`) |
@@ -63,13 +64,14 @@ Each routine run is a job, recording who it acted for, which connection it used,
 - One restricted database role handles normal operations. Each request or routine sets its person or space for the transaction, and background workers get no elevated access.
 - A separate admin role is used only for migrations and narrowly defined housekeeping, such as deletion cascades and access-table updates. The normal role can't write the access table, and changes spaces and memberships only through database functions that check the caller's rights.
 - It covers sensitive data: content, sources, credentials and search data. Purely technical tables don't need the same policies.
+- Sign-in has its own database role and schema. It can't read space data, and Homing's role can't read passwords, passkeys or sessions. An account has the same id as its person, and only accepting an invite creates both.
 - The application still filters explicitly. Row-level security catches missing filters. It is not protection against a fully compromised application.
 
 ## Self-hosting
 
 Self-hosting is part of the product, not something users piece together: HTTPS, MCP authentication, OAuth callbacks, migrations, upgrades, backup and restore. A full backup includes the encryption key. A Markdown export is not an operational backup.
 
-Migrations run as a separate step before the server starts, so the running server never holds the admin role. Local agents such as Claude Code connect with a personal token, of which Homing keeps only a hash, and a person can revoke their tokens. Claude.ai and ChatGPT need OAuth, which comes later.
+Migrations run as a separate step before the server starts, so the running server never holds the admin role. When the server starts and nobody looks after the instance yet, it prints the setup link for the first account. The link works once, for an hour, and only a hash of its token is kept. Local agents such as Claude Code connect with a personal token, of which Homing keeps only a hash, and a person can revoke their tokens. Claude.ai and ChatGPT need OAuth, which comes later.
 
 Until there is sign-in and a web app, a command-line tool sets up people, spaces and tokens, and edits guidance. It is a stand-in, not the intended way to use Homing.
 
@@ -78,7 +80,3 @@ The command line and the database credentials are operator access. The command l
 ## Toward a hosted version
 
 Homing is designed so it could run as a managed service, without building that in v1. Roots are organizational boundaries, not tenant isolation. A hosted service would also need identities, credentials, storage, indexes and execution kept separate per tenant.
-
-## Open
-
-- A built-in OAuth authorization server, or a delegated identity provider.

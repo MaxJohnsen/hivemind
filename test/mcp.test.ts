@@ -5,26 +5,27 @@
 // come with them.
 
 import assert from 'node:assert/strict';
-import type { AddressInfo, Server } from 'node:net';
 import { after, before, test } from 'node:test';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { addRule } from '../src/guidance.ts';
 import { createPage, writeItem } from '../src/knowledge.ts';
 import { saveSkill } from '../src/skills.ts';
-import { startServer } from '../src/server.ts';
+import { startServer, type Homing } from '../src/server.ts';
 import { addMember, createSpace } from '../src/spaces.ts';
 import { createToken, revokeTokens } from '../src/tokens.ts';
+import { authDatabaseUrl } from '../src/db.ts';
 import { as, db, person } from './helpers.ts';
+import { inTestDatabase } from './reset.ts';
 
-let server: Server;
+let homing: Homing;
 let url: URL;
 
 before(async () => {
-  server = await startServer(db, { port: 0, host: '127.0.0.1' });
-  url = new URL(`http://localhost:${(server.address() as AddressInfo).port}/mcp`);
+  homing = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase: inTestDatabase(authDatabaseUrl) });
+  url = new URL('/mcp', homing.url);
 });
 
-after(() => new Promise((resolve) => server.close(resolve)));
+after(() => homing.close());
 
 /** A new agent session for a person, like opening Claude Code. */
 async function session(token: string) {

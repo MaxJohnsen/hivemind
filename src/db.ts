@@ -20,6 +20,10 @@ export interface Session {
 export const databaseUrl =
   process.env.DATABASE_URL ?? 'postgres://homing_app:homing_app@localhost:5442/homing';
 
+/** Sign-in's own role, which can use only the auth schema. */
+export const authDatabaseUrl =
+  process.env.AUTH_DATABASE_URL ?? 'postgres://homing_auth:homing_auth@localhost:5442/homing';
+
 /** The admin role, used only to run migrations. */
 export const adminUrl =
   process.env.DATABASE_ADMIN_URL ?? 'postgres://homing:homing@localhost:5442/homing';

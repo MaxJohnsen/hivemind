@@ -162,6 +162,12 @@ Someone who uses Homing has an account. Everyone else is a page. Matching people
 - Merging is logical. Pages marked as the same subject are shown as one page to anyone who can see both. Nothing moves, so private items and history are untouched, and removing the link undoes it.
 - Knowledge is never combined across spaces. Pages in different spaces that share an identifier are linked only for people who can access both.
 
+**Signing in.** People sign in to Homing itself, and their assistants act as them.
+
+- Joining is by invite only. When Homing starts and nobody looks after it yet, it shows a one-time setup link for the first account. That account is the instance admin: it invites people, but gets no access to anyone's spaces.
+- A passkey is offered first, and a password is optional. The instance admin signs in only with passkeys. A person can add more ways to sign in to their account, and accounts are never joined because an email address matches.
+- Recovery goes to the person's own verified email, which only they can change. Without email, whoever runs the server helps. Nobody, the instance admin included, can sign in as someone else.
+
 ## 5. Sharing
 
 Homing learns privately by default and shares automatically only when sharing is already authorized. Otherwise it asks, once per clearly defined scope.
