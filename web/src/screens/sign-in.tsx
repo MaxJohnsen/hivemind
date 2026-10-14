@@ -24,14 +24,13 @@ export function SignIn({ connecting, initial = 'email' }: { connecting?: string;
   };
 
   return (
-    <div className="relative grid min-h-dvh lg:grid-cols-2">
-      {/* The bird brings a card, knowledge, from the shelf to the person signing in. */}
-      <img src={bird} alt="" width={440} height={340} className="pointer-events-none absolute top-[44%] left-1/2 z-10 hidden w-52 -translate-x-1/2 -translate-y-1/2 lg:block" />
+    <div className="grid min-h-dvh lg:grid-cols-2">
       <div className="flex flex-col px-6 py-6 sm:px-10">
         <Wordmark className="text-lg" />
         <main className="flex flex-1 items-start pt-24 pb-10 sm:items-center lg:pt-10">
           <div className="relative mx-auto flex w-full max-w-sm flex-col gap-7 rounded-2xl border bg-card p-6 sm:p-8">
-            <img src={bird} alt="" width={440} height={340} className="pointer-events-none absolute left-1/2 -top-[84px] w-32 -translate-x-1/2 lg:hidden" />
+            {/* The bird brings a note, knowledge, to the person signing in. */}
+            <img src={bird} alt="" width={579} height={464} className="pointer-events-none absolute -top-[84px] -right-2 w-32 sm:-top-[112px] sm:-right-10 sm:w-44" />
             <div className="flex flex-col gap-1.5">
               <h1 className="text-[28px] leading-tight font-semibold tracking-tight">
                 {connecting ? `Sign in to connect ${connecting}` : 'Sign in to Homing'}
