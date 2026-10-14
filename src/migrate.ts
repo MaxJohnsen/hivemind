@@ -10,14 +10,14 @@ const directory = new URL('../migrations/', import.meta.url);
  */
 export async function migrate(admin = adminUrl, app = databaseUrl): Promise<void> {
   const { username, password } = new URL(app);
-  if (username !== 'hivemind_app') {
-    throw new Error('DATABASE_URL must connect as hivemind_app');
+  if (username !== 'homing_app') {
+    throw new Error('DATABASE_URL must connect as homing_app');
   }
 
   const sql = postgres(admin, { max: 1, onnotice: () => {} });
   try {
     await sql.begin(async (tx) => {
-      await tx`select pg_advisory_xact_lock(hashtext('hivemind.migrate'))`;
+      await tx`select pg_advisory_xact_lock(hashtext('homing.migrate'))`;
       await tx`
         create table if not exists schema_migrations (
           name text primary key,
@@ -31,7 +31,7 @@ export async function migrate(admin = adminUrl, app = databaseUrl): Promise<void
         await tx`insert into schema_migrations (name) values (${file})`;
       }
       const [{ statement }] = await tx`
-        select format('alter role hivemind_app with login password %L', ${decodeURIComponent(password)}::text) as statement
+        select format('alter role homing_app with login password %L', ${decodeURIComponent(password)}::text) as statement
       `;
       await tx.unsafe(statement);
     });

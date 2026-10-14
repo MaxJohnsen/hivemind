@@ -9,7 +9,7 @@ const root = import.meta.dirname;
 // inlines the script, the styles and every asset into card.html.
 function singleFile(): Plugin {
   return {
-    name: 'hivemind-single-file',
+    name: 'homing-single-file',
     enforce: 'post',
     generateBundle(_, bundle) {
       const html = Object.values(bundle).find((file) => file.fileName.endsWith('.html'));

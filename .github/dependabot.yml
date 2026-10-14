@@ -9,7 +9,7 @@ updates:
       dependencies:
         patterns: ["*"]
     ignore:
-      # The types follow the oldest Node.js version Hivemind supports.
+      # The types follow the oldest Node.js version Homing supports.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions

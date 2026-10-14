@@ -12,7 +12,7 @@
 -- a person acts directly.
 create function current_agent() returns text
 language sql stable
-as $$ select nullif(current_setting('hivemind.agent', true), '') $$;
+as $$ select nullif(current_setting('homing.agent', true), '') $$;
 
 create table sources (
   id uuid primary key default gen_random_uuid(),
@@ -183,10 +183,10 @@ using (
 );
 
 -- Authorship and timestamps are never written directly.
-revoke insert, update on content from hivemind_app;
-grant insert (space_id, private_to, page_id, kind, body, supersedes) on content to hivemind_app;
-grant update (body) on content to hivemind_app;
-grant select, insert (space_id, private_to, reference, excerpt) on sources to hivemind_app;
-grant select, insert (id, space_id, type) on pages to hivemind_app;
-grant select, insert on citations to hivemind_app;
-grant select on revisions to hivemind_app;
+revoke insert, update on content from homing_app;
+grant insert (space_id, private_to, page_id, kind, body, supersedes) on content to homing_app;
+grant update (body) on content to homing_app;
+grant select, insert (space_id, private_to, reference, excerpt) on sources to homing_app;
+grant select, insert (id, space_id, type) on pages to homing_app;
+grant select, insert on citations to homing_app;
+grant select on revisions to homing_app;

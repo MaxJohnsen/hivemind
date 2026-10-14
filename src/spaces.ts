@@ -76,7 +76,7 @@ export async function peopleNames(s: Session, ids: (string | null)[]): Promise<M
 
 /**
  * The spaces the principal can access: a person's through the access table,
- * a space only itself. Hivemind filters with this explicitly, and row-level
+ * a space only itself. Homing filters with this explicitly, and row-level
  * security applies the same rule underneath.
  */
 export function accessibleSpaces(s: Session) {

@@ -4,8 +4,8 @@
 // client's shared side, a private note on it that cites an email and has an
 // earlier version, notes in their personal space, a shared and a private
 // rule for their client, and a skill. Each tries to read and
-// change the other's, in three ways: through Hivemind, through Hivemind with
-// row-level security off, and straight against the database with Hivemind's
+// change the other's, in three ways: through Homing, through Homing with
+// row-level security off, and straight against the database with Homing's
 // filters bypassed. So each layer is shown to refuse on its own.
 
 import assert from 'node:assert/strict';
@@ -73,8 +73,8 @@ const attempts = () => [
 ];
 
 for (const [layer, sql] of [
-  ['through Hivemind', db],
-  ['through Hivemind, with row-level security off', admin],
+  ['through Homing', db],
+  ['through Homing, with row-level security off', admin],
 ] as const) {
   describe(layer, () => {
     test('nobody sees another client’s spaces, pages or items', async () => {
@@ -266,14 +266,14 @@ describe('straight against the database', () => {
     }
   });
 
-  test('nobody can put their own table in place of Hivemind’s', async () => {
+  test('nobody can put their own table in place of Homing’s', async () => {
     await assert.rejects(
       as(acme.person, (s) => s.tx`create temp table space_access (person_id uuid, space_id uuid, admin boolean)`),
       refused,
     );
   });
 
-  test('Hivemind’s role is restricted, and every table it can read is protected', async () => {
+  test('Homing’s role is restricted, and every table it can read is protected', async () => {
     const [role] = await db`select rolsuper, rolbypassrls from pg_roles where rolname = current_user`;
     assert.deepEqual(role, { rolsuper: false, rolbypassrls: false });
 

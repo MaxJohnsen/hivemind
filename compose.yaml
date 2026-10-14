@@ -1,16 +1,18 @@
+name: homing
+
 services:
   db:
     image: postgres:18-alpine
     environment:
-      POSTGRES_USER: hivemind
-      POSTGRES_PASSWORD: hivemind
-      POSTGRES_DB: hivemind
+      POSTGRES_USER: homing
+      POSTGRES_PASSWORD: homing
+      POSTGRES_DB: homing
     ports:
-      - "127.0.0.1:${HIVEMIND_DB_PORT:-5442}:5432"
+      - "127.0.0.1:${HOMING_DB_PORT:-5442}:5432"
     volumes:
       - db:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hivemind"]
+      test: ["CMD-SHELL", "pg_isready -U homing"]
       interval: 2s
       retries: 30
 
@@ -19,18 +21,18 @@ services:
     build: .
     command: ["node", "src/migrate.ts"]
     environment:
-      DATABASE_URL: postgres://hivemind_app:hivemind_app@db:5432/hivemind
-      DATABASE_ADMIN_URL: postgres://hivemind:hivemind@db:5432/hivemind
+      DATABASE_URL: postgres://homing_app:homing_app@db:5432/homing
+      DATABASE_ADMIN_URL: postgres://homing:homing@db:5432/homing
     depends_on:
       db:
         condition: service_healthy
 
-  hivemind:
+  homing:
     build: .
     environment:
-      DATABASE_URL: postgres://hivemind_app:hivemind_app@db:5432/hivemind
+      DATABASE_URL: postgres://homing_app:homing_app@db:5432/homing
     ports:
-      - "127.0.0.1:${HIVEMIND_PORT:-4100}:4100"
+      - "127.0.0.1:${HOMING_PORT:-4100}:4100"
     depends_on:
       migrate:
         condition: service_completed_successfully

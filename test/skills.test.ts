@@ -106,8 +106,8 @@ test('a skill is a SKILL.md with a name and description, and only text files', a
   await symlink(join(root, 'SKILL.md'), join(root, 'assets', 'copy.md'));
   await assert.rejects(readSkillFolder(root), {
     message:
-      "Hivemind keeps only text files up to 512 KB in skills for now. These aren't text: assets/logo.png, assets/sizes.bin. " +
-      "These are larger than 512 KB: assets/manual.txt. These are links, which Hivemind doesn't follow: assets/copy.md.",
+      "Homing keeps only text files up to 512 KB in skills for now. These aren't text: assets/logo.png, assets/sizes.bin. " +
+      "These are larger than 512 KB: assets/manual.txt. These are links, which Homing doesn't follow: assets/copy.md.",
   });
 
   // Hidden files are skipped, and named.
