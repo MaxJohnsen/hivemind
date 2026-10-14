@@ -58,11 +58,24 @@ Hivemind is a wordmark in Figtree for now; a logo comes later. Figtree is the on
 
 ## Illustrations
 
-Colored-pencil drawings of people and everyday things, in sage, peach and warm grey, light and airy. They appear only on welcome, onboarding, success and empty pages, never on approvals or routine screens. They're drawn on pure white, so they blend into the linen without a box. No robots, brains, bees or hexagons.
+Every drawing says something about Hivemind, with the same few objects:
 
-Each one is generated with an image model from the same style, so they look like the work of one artist:
+| Concept | Drawn as |
+|---|---|
+| An assistant | The paper bird, Hivemind's mascot. It carries what it learned to where it belongs |
+| A space | A box on a shelf |
+| Knowledge | Index cards |
+| Only yours | A closed notebook |
+| Rules | A note pinned to the wall |
+| Kept current | An old date crossed out, with a new card beside it |
 
-> Soft colored-pencil drawing with gentle visible pencil texture, rounded friendly shapes, a muted pastel palette of sage green, soft peach and warm gray, light and airy, skilled but slightly naive. Plenty of empty space, nothing cropped. Pure flat white background. No text, no logos, no screens.
+Drawings are scenes with people, in colored pencil, in sage, peach and warm grey, light and airy. They appear only on welcome, onboarding, success and empty pages, never on approvals or routine screens. They're drawn on pure white, so they blend into the linen without a box. No robots, brains, bees, hexagons or screens.
+
+The bird always looks like its character sheet, [`docs/design/paper-bird.jpg`](design/paper-bird.jpg): sage wings, a peach beak and belly, a small dark eye, the same folds. Every drawing with the bird is generated with the sheet as a reference, in this style:
+
+> Soft colored-pencil drawing with gentle visible pencil texture, rounded friendly shapes, a muted pastel palette of sage green, soft peach and warm gray, light and airy. Plenty of empty space, nothing cropped. Pure flat white background. No text, no logos, no screens.
+
+On the sign-in page the bird is also drawn as flat folds, so its wings can move: it flies in and lands on the sign-in card, once per visit. With reduced motion it is simply there.
 
 ## The approval card
 
