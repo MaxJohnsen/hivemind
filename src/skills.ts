@@ -23,13 +23,13 @@ export interface Skill {
   privateTo: string | null;
 }
 
-/** The largest file Hivemind keeps in a skill for now, so it can still be searched. */
+/** The largest file Homing keeps in a skill for now, so it can still be searched. */
 const largest = 512 * 1024;
 
 /**
  * Reads a skill folder in the Agent Skills format: a SKILL.md with a name
  * and a description, and any other files. Hidden files, such as .DS_Store,
- * are skipped and listed. Hivemind keeps only text files up to 512 KB for
+ * are skipped and listed. Homing keeps only text files up to 512 KB for
  * now, and doesn't follow links, so a folder with anything else is refused
  * as a whole, naming what it can't keep.
  */
@@ -53,10 +53,10 @@ export async function readSkillFolder(folder: string): Promise<{ files: SkillFil
   const problems = [
     refused.binary.length && `These aren't text: ${refused.binary.sort().join(', ')}.`,
     refused.large.length && `These are larger than 512 KB: ${refused.large.sort().join(', ')}.`,
-    refused.links.length && `These are links, which Hivemind doesn't follow: ${refused.links.sort().join(', ')}.`,
+    refused.links.length && `These are links, which Homing doesn't follow: ${refused.links.sort().join(', ')}.`,
   ].filter(Boolean);
   if (problems.length) {
-    throw new Error(`Hivemind keeps only text files up to 512 KB in skills for now. ${problems.join(' ')}`);
+    throw new Error(`Homing keeps only text files up to 512 KB in skills for now. ${problems.join(' ')}`);
   }
   return { files: files.sort((a, b) => a.path.localeCompare(b.path)), skipped: skipped.sort() };
 }

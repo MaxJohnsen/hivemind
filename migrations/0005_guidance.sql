@@ -8,12 +8,12 @@
 -- Knowledge never reaches down.
 
 -- Whether a person is editing directly, as in the web app or the command
--- line. Hivemind marks only those paths, so a new path can't change guidance
+-- line. Homing marks only those paths, so a new path can't change guidance
 -- just by forgetting to name its agent.
 create function direct_edit() returns boolean
 language sql stable
 as $$
-  select current_setting('hivemind.direct', true) = 'true'
+  select current_setting('homing.direct', true) = 'true'
      and current_person_id() is not null
      and current_agent() is null
 $$;
@@ -86,7 +86,7 @@ as $$
 $$;
 
 revoke execute on function guidance_page, guidance_reach, spaces_above from public;
-grant execute on function guidance_page, guidance_reach, spaces_above to hivemind_app;
+grant execute on function guidance_page, guidance_reach, spaces_above to homing_app;
 
 -- Only people change guidance. Shared guidance is changed by the space's
 -- admins, and private guidance by its owner, which row-level security
@@ -171,4 +171,4 @@ with check (
   and source_id in (select id from sources)
 );
 
-grant insert (reaches_down) on content to hivemind_app;
+grant insert (reaches_down) on content to homing_app;

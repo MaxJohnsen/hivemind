@@ -1,31 +1,31 @@
 # Specification
 
-How Hivemind must behave. The [concept](concept.md) explains the idea. This document makes it precise: the promises Hivemind keeps, how each part works, and what is still open. How it is built is described in the [architecture](architecture.md).
+How Homing must behave. The [concept](concept.md) explains the idea. This document makes it precise: the promises Homing keeps, how each part works, and what is still open. How it is built is described in the [architecture](architecture.md).
 
 Each section opens with the short version. The details follow for those who need them.
 
 ## Guarantees
 
-These hold for everything that passes through Hivemind, whatever the implementation.
+These hold for everything that passes through Homing, whatever the implementation.
 
-1. **Nothing is published without authorization.** Hivemind never shows information to people who aren't authorized to see it, especially across clients. Publishing actions run at most once. If the outcome is unknown, Hivemind checks or asks instead of retrying.
+1. **Nothing is published without authorization.** Homing never shows information to people who aren't authorized to see it, especially across clients. Publishing actions run at most once. If the outcome is unknown, Homing checks or asks instead of retrying.
 2. **Every operation is checked for permission,** whatever a model asks for.
 3. **Untrusted input is contained** by limiting what an agent can do, not by trusting how it reads.
 4. **Only people change guidance.** Ingested content can never change rules, skills or permissions, and neither can an agent acting in your name without your explicit approval.
-5. **Credentials never reach a model.** Personal connections are never shared, and Hivemind never silently switches identity.
+5. **Credentials never reach a model.** Personal connections are never shared, and Homing never silently switches identity.
 6. **Mandatory guidance is never dropped** to save space.
 7. **Everything records where it came from:** its sources, or the person or agent who wrote it.
 8. **Records stay authoritative where they live.** Changes go back to their home system, under that system's permissions. Private notes are never written back.
-9. **Hivemind is fully usable through MCP alone.** Every write names its destination.
+9. **Homing is fully usable through MCP alone.** Every write names its destination.
 10. **Spaces are portable.** Export and re-import keep a space's knowledge intact. Credentials and live external records are not exported.
 
-For its own routines, guarantee 1 holds by design: runs are scoped before they start, and content carries its sources (§5, §8). For external agents such as Claude or ChatGPT, Hivemind checks every action performed through it and asks before anything unauthorized. It cannot know what an agent saw elsewhere, and doesn't pretend to.
+For its own routines, guarantee 1 holds by design: runs are scoped before they start, and content carries its sources (§5, §8). For external agents such as Claude or ChatGPT, Homing checks every action performed through it and asks before anything unauthorized. It cannot know what an agent saw elsewhere, and doesn't pretend to.
 
-The guarantees hold for everything that goes through Hivemind. Whoever can reach the server itself, such as its database or its administration tools, has operator access and can act as anyone. That is outside the guarantees, so agents must never be given it.
+The guarantees hold for everything that goes through Homing. Whoever can reach the server itself, such as its database or its administration tools, has operator access and can act as anyone. That is outside the guarantees, so agents must never be given it.
 
 Two release tests make guarantees 2 and 10 concrete:
 
-- **Leak test.** Two people in different client spaces, each with shared and private knowledge, try to read and write across clients through every storage path. The test runs through Hivemind and directly against the database with Hivemind's filters bypassed, so the database is shown to refuse on its own.
+- **Leak test.** Two people in different client spaces, each with shared and private knowledge, try to read and write across clients through every storage path. The test runs through Homing and directly against the database with Homing's filters bypassed, so the database is shown to refuse on its own.
 - **Round trip.** A space is exported and re-imported, and must come back intact.
 
 ## 1. Spaces and access
@@ -34,7 +34,7 @@ You can see a space's shared side if you have access to the space, and you alway
 
 **The access rule.** Everything in a space records its space and, when it is private, whose it is (`private_to`). You can see an item if you can access its space and it is either shared or yours.
 
-- Access comes from memberships, parents and closed spaces. Hivemind keeps it in a derived access table, updated in the same transaction as the change, so removing someone takes effect immediately. Every query, search and job checks it.
+- Access comes from memberships, parents and closed spaces. Homing keeps it in a derived access table, updated in the same transaction as the change, so removing someone takes effect immediately. Every query, search and job checks it.
 - Only a space's admins create spaces under it. A child space passes the parent's shared guidance on to its own members, so creating one, and choosing its admins, delegates who receives that guidance.
 - Guidance is the one exception. A shared rule is also visible in every space below its own that it reaches, rule by rule, never the whole guidance page. Private and *only here* rules stay where they are, private guidance reaches down only for its owner, and knowledge never reaches down. Because the exception is part of the rule, `context`, `search` and `read` always agree.
 
@@ -44,9 +44,9 @@ You can see a space's shared side if you have access to the space, and you alway
 - A new member sees the knowledge, not the original sources.
 - A group that needs a restricted history uses a separate space.
 
-**Your personal tree is private.** Spaces you create under your personal space are only yours. Nobody else can be given access, everything in them is on your private side, and Hivemind never suggests sharing there. Creating a space asks: "Just me, or with others?"
+**Your personal tree is private.** Spaces you create under your personal space are only yours. Nobody else can be given access, everything in them is on your private side, and Homing never suggests sharing there. Creating a space asks: "Just me, or with others?"
 
-**Making a space collaborative** is a deliberate conversion. Inviting someone to a space in your personal tree starts it, or you can start it directly. Hivemind:
+**Making a space collaborative** is a deliberate conversion. Inviting someone to a space in your personal tree starts it, or you can start it directly. Homing:
 
 - moves the space and everything under it out of your personal tree, as a new root or under a shared space you choose;
 - shows who will gain access;
@@ -65,22 +65,22 @@ Guidance is rules and skills. It applies down the tree, the more specific rule w
 **Stored like knowledge.** Guidance uses the same pages and content as knowledge (§3), with its own rules for who may write it, how far it reaches and how it loads. There are two reserved page types, fixed when the page is created:
 
 - A **guidance page.** One per space, with one item per rule. A rule is a requirement or a preference, and can be marked *only here*. It exports as AGENTS.md.
-- A **skill page.** Instructions plus files such as references and scripts, kept as a SKILL.md folder in the [Agent Skills](https://agentskills.io/specification) format, so it comes back out as it went in. It can be served as `skill://` resources. Hivemind makes skills available; whether an agent can run a skill's scripts depends on its client.
+- A **skill page.** Instructions plus files such as references and scripts, kept as a SKILL.md folder in the [Agent Skills](https://agentskills.io/specification) format, so it comes back out as it went in. It can be served as `skill://` resources. Homing makes skills available; whether an agent can run a skill's scripts depends on its client.
 
-Hivemind picks the rules that apply and puts them in order, and requirements always load. Skills are picked by relevance.
+Homing picks the rules that apply and puts them in order, and requirements always load. Skills are picked by relevance.
 
 **How it flows.**
 
 - Guidance applies to its space and everything below it, unless it is marked *only here*.
-- It reaches everyone in a child space, including people who can't access the parent. A closed space blocks inherited membership, not guidance. When you edit shared guidance, Hivemind tells you it also applies to child spaces, including closed ones you can't access, and that *only here* prevents it. It reveals nothing about those spaces.
+- It reaches everyone in a child space, including people who can't access the parent. A closed space blocks inherited membership, not guidance. When you edit shared guidance, Homing tells you it also applies to child spaces, including closed ones you can't access, and that *only here* prevents it. It reveals nothing about those spaces.
 - Your personal space's own guidance follows you everywhere. Spaces under your personal space behave like any other.
 - An include pulls in other guidance by link. It expands only for readers who can access what it points to, and never grants access.
 
 **Precedence.**
 
-- Hivemind picks the rules that apply and orders them from least to most specific, with requirements marked. Personal-space guidance counts as the least specific.
+- Homing picks the rules that apply and orders them from least to most specific, with requirements marked. Personal-space guidance counts as the least specific.
 - The more specific preference wins, and between equally specific preferences the private one wins. A preference never wins over a requirement.
-- Hivemind doesn't judge whether two rules contradict each other, because that means interpreting their text. The agent does, and Hivemind can't guarantee it notices every contradiction.
+- Homing doesn't judge whether two rules contradict each other, because that means interpreting their text. The agent does, and Homing can't guarantee it notices every contradiction.
 - If two requirements conflict, the agent stops the affected action, tells the user which rules conflict, and can propose a fix.
 - When someone adds a rule, they see the rules that already apply there.
 - Skills are matched by name. A skill in a more specific space replaces an inherited one with the same name, personal skills are the least specific, and between equally specific skills the private one wins.
@@ -91,11 +91,11 @@ Shared guidance is changed by the space's admins, and other members can propose 
 
 **Always live.** There is no version pinning. History and rollback are kept, and each run uses one consistent snapshot.
 
-**It improves through use.** Three things lead to a proposed change: a correction, a contradiction with knowledge, and repeated failures. After a correction, the agent asks "just this time, or always?". "Always" becomes `guidance.propose` with the exact text, which works from any MCP client. Hivemind may learn to propose less without asking.
+**It improves through use.** Three things lead to a proposed change: a correction, a contradiction with knowledge, and repeated failures. After a correction, the agent asks "just this time, or always?". "Always" becomes `guidance.propose` with the exact text, which works from any MCP client. Homing may learn to propose less without asking.
 
 ## 3. Knowledge
 
-Knowledge is built from sources into pages of small, sourced items. Hivemind keeps it organized on its own, but only evidence changes what it says.
+Knowledge is built from sources into pages of small, sourced items. Homing keeps it organized on its own, but only evidence changes what it says.
 
 > Knowledge is structured only as much as necessary to maintain, retrieve and share it reliably.
 
@@ -117,14 +117,14 @@ There is no claim extraction, no fact keys and no automatic dependencies between
 
 **Knowledge without a home stays in its source.** Excerpts remain searchable, and when a subject earns a page, the page is built from them. Nothing is dumped on the overview.
 
-**The overview is a map.** It holds a short summary of the space's current state, plus a list of its active pages that Hivemind generates. It is never an index written by an agent.
+**The overview is a map.** It holds a short summary of the space's current state, plus a list of its active pages that Homing generates. It is never an index written by an agent.
 
-**Upkeep.** Hivemind keeps improving how knowledge is organized and presented, while its meaning stays grounded in evidence. The agent doing the upkeep (Hivemind's own model, or an external agent if there is none) proposes operations from a fixed set. Hivemind applies them, checking permissions and protection and recording history. Every operation preserves visibility and provenance, and every operation can be undone.
+**Upkeep.** Homing keeps improving how knowledge is organized and presented, while its meaning stays grounded in evidence. The agent doing the upkeep (Homing's own model, or an external agent if there is none) proposes operations from a fixed set. Homing applies them, checking permissions and protection and recording history. Every operation preserves visibility and provenance, and every operation can be undone.
 
 | Operation | Rule |
 |---|---|
 | Write or update an item | Only from evidence. New evidence updates only the items it affects. The agent finds them; there is no automatic dependency chain. |
-| Supersede an item | When evidence justifies it, such as an explicit change or a decision by someone with authority. The old item is kept as "was true until…". Newer isn't automatically right, so when it's unclear, both are marked uncertain. A private update can replace shared knowledge in your own view without changing what others see, and it shows that others still see the earlier version. Hivemind suggests sharing meaningful updates when appropriate. |
+| Supersede an item | When evidence justifies it, such as an explicit change or a decision by someone with authority. The old item is kept as "was true until…". Newer isn't automatically right, so when it's unclear, both are marked uncertain. A private update can replace shared knowledge in your own view without changing what others see, and it shows that others still see the earlier version. Homing suggests sharing meaningful updates when appropriate. |
 | Improve wording | Items written by agents only, and always regenerated from the item's sources, never from its previous text, so errors can't compound. |
 | Combine duplicates | Keep one item, citing both sources. |
 | Create, split or move | Items written by agents only. Text written by a person stays where it is and gets a link. |
@@ -148,9 +148,9 @@ Upkeep runs when new evidence arrives, and in a periodic tidy pass per space tha
 
 ## 4. People and identity
 
-Someone who uses Hivemind has an account. Everyone else is a page. Matching people across systems is conservative.
+Someone who uses Homing has an account. Everyone else is a page. Matching people across systems is conservative.
 
-- **An account** belongs to someone who uses Hivemind. Its identifiers are the ones its provider verifies, plus the ones the person confirms. Connecting Gmail proves control of that account, not of every alias. Addresses only seen in messages are suggestions.
+- **An account** belongs to someone who uses Homing. Its identifiers are the ones its provider verifies, plus the ones the person confirms. Connecting Gmail proves control of that account, not of every alias. Addresses only seen in messages are suggestions.
 - **Everyone else is a page,** like any other subject. There is no contact database and no global person registry.
 - **Identifiers are items with a structured value:** system, tenant, type and value, such as `slack · acme-workspace · U123`. They are the one structured key in knowledge, because routing depends on deterministic matching. They are indexed for matching, and visibility applies during matching: a private phone number never helps anyone else identify Gunnar. The strength of a match follows from the identifier's type.
 
@@ -164,7 +164,7 @@ Someone who uses Hivemind has an account. Everyone else is a page. Matching peop
 
 ## 5. Sharing
 
-Hivemind learns privately by default and shares automatically only when sharing is already authorized. Otherwise it asks, once per clearly defined scope.
+Homing learns privately by default and shares automatically only when sharing is already authorized. Otherwise it asks, once per clearly defined scope.
 
 **Sources never change audience; knowledge is published from them.**
 
@@ -177,7 +177,7 @@ Hivemind learns privately by default and shares automatically only when sharing 
 
 **Audience informs; authorization decides.** A source's audience is who could see it in its own system. Adapters report it when they can: an email's visible recipients, a channel's or DM's members, a meeting's attendees. Otherwise it is unknown, and the content stays private to whoever connected or supplied it. Audience alone never authorizes sharing, even when everyone in a space could already see the source, because the shared side also serves future members. Audience makes suggestions useful ("Ola was on this thread") and detects material changes.
 
-**Hivemind only interrupts when a deliberate decision is needed:**
+**Homing only interrupts when a deliberate decision is needed:**
 
 - an **approval,** when something is about to reach people who aren't authorized yet;
 - a **suggestion,** when private knowledge would genuinely help a space. This happens in every ordinary space, even one with a single member, because the shared side serves future members too. It never happens in your personal tree.
@@ -200,9 +200,9 @@ An authorized person can create either one directly in the web app. When an agen
 
 ## 6. Proposals and approvals
 
-Whenever Hivemind needs a person to decide, it creates a proposal: an exact change, waiting for the authorization it needs.
+Whenever Homing needs a person to decide, it creates a proposal: an exact change, waiting for the authorization it needs.
 
-Hivemind is designed to be used through ordinary AI conversations, and everything can be started from any MCP client. Agents save and organize knowledge on their own. Changes to guidance, sharing and access are decided by people: you confirm the exact change in the conversation when the client can support that securely, and otherwise on a small confirmation page.
+Homing is designed to be used through ordinary AI conversations, and everything can be started from any MCP client. Agents save and organize knowledge on their own. Changes to guidance, sharing and access are decided by people: you confirm the exact change in the conversation when the client can support that securely, and otherwise on a small confirmation page.
 
 One concept covers guidance changes, sharing suggestions, publishing approvals, updates to published knowledge, and the catch-up when a space becomes collaborative. A proposal holds the change, why it was made (a correction, new evidence, an agent), its deciders and its state (open, approved, rejected or expired).
 
@@ -216,22 +216,22 @@ One concept covers guidance changes, sharing suggestions, publishing approvals, 
 
 ## 7. Connections and records
 
-Spaces point to places; people hold keys. Records stay in the system where they live, and Hivemind reads them live.
+Spaces point to places; people hold keys. Records stay in the system where they live, and Homing reads them live.
 
 | Concept | What it is |
 |---|---|
 | Connection | A key: credentials for one account in one system. It belongs to a person, or to a space for shared automation. It is encrypted and never visible to a model. |
 | Place | A space's pointer to where things live: system, tenant and resource, such as "Acme's Asana, project Website". A place can be bound to its space (§5). |
 
-- **Places are matched to keys automatically,** by stable IDs and a per-action check: can this connection do this here? Your own connection comes first, then an authorized space connection, and otherwise Hivemind asks. One connection can serve many spaces, and a space can use many connections.
+- **Places are matched to keys automatically,** by stable IDs and a per-action check: can this connection do this here? Your own connection comes first, then an authorized space connection, and otherwise Homing asks. One connection can serve many spaces, and a space can use many connections.
 - **Connection status is informative.** A missing connection is shown when it matters and never blocks other work.
-- **Hivemind never needs exclusive control of an integration.** Agents can bring their own access, such as an organization's connectors, with no mode switch. What they report back is marked as agent-reported and stays private, and context says plainly what Hivemind can and can't reach. Only work Hivemind does itself needs a Hivemind key.
+- **Homing never needs exclusive control of an integration.** Agents can bring their own access, such as an organization's connectors, with no mode switch. What they report back is marked as agent-reported and stays private, and context says plainly what Homing can and can't reach. Only work Homing does itself needs a Homing key.
 
 **Records.**
 
-- Every record lives in one system, behind one record interface. Hivemind's own tasks are one system and Asana is another. Building for two from day one keeps the interface from becoming Asana-shaped.
-- Hivemind's own tasks are deliberately minimal, so you can capture actions without another product: a title, a description, open or done, an optional due date, an optional assignee, space and visibility, and optional provenance. Recurrence, reminders, multiple assignees and project management are not part of v1.
-- External records are read live through a connection that reaches the place, with a short-lived cache and no mirror in v1. The cache is reused only through the same connection, and Hivemind's access check runs before anything is served from it. Permission changes made in the external system take effect when the cache expires; no cache can do better without checking live. When a system is down, cached data is shown with its age. A persistent index is a later optimization.
+- Every record lives in one system, behind one record interface. Homing's own tasks are one system and Asana is another. Building for two from day one keeps the interface from becoming Asana-shaped.
+- Homing's own tasks are deliberately minimal, so you can capture actions without another product: a title, a description, open or done, an optional due date, an optional assignee, space and visibility, and optional provenance. Recurrence, reminders, multiple assignees and project management are not part of v1.
+- External records are read live through a connection that reaches the place, with a short-lived cache and no mirror in v1. The cache is reused only through the same connection, and Homing's access check runs before anything is served from it. Permission changes made in the external system take effect when the cache expires; no cache can do better without checking live. When a system is down, cached data is shown with its age. A persistent index is a later optimization.
 - Freshness is shown honestly, not promised. Binding a place doesn't settle record permissions, because they can differ per item.
 - **Annotations** are your notes on any record: items attached to a record instead of a page, with the same visibility, history and protection. They are never written back.
 
@@ -241,7 +241,7 @@ A routine is work that happens on its own. It always acts for a person or a spac
 
 **Two kinds.** System routines are built in and part of v1: capturing from connected sources, routing, triage and knowledge upkeep. They are what "learns automatically" depends on. User routines, such as "a status report every Friday", come later, along with external triggers and pluggable runtimes.
 
-**What a routine is.** An owner, a trigger, a skill, a space and an output. Each run records who it acted for, which connection it used, what it did and which proposals it created. Triggers can come from Hivemind's schedule, from connection events, or from an external scheduler calling "run routine X". Hivemind orchestrates, and a pluggable runtime does the work.
+**What a routine is.** An owner, a trigger, a skill, a space and an output. Each run records who it acted for, which connection it used, what it did and which proposals it created. Triggers can come from Homing's schedule, from connection events, or from an external scheduler calling "run routine X". Homing orchestrates, and a pluggable runtime does the work.
 
 **Every routine belongs to a person or a space. There is no system identity.**
 
@@ -261,7 +261,7 @@ A space routine never reads anyone's private side: if an automation needs your m
 
 **Private work is automatic; publishing isn't.** A person routine updates its owner's private knowledge, notes and tasks across all their spaces without asking. Weekly planning across clients is an ordinary person routine, and its results stay private. A routine publishes automatically only when both the action and every input are authorized for the destination. Being scoped to a space isn't enough: a private email about Acme doesn't become shareable because the routine runs in Acme.
 
-**Containment.** A routine that reads untrusted input runs where all its tools come from Hivemind. A run that holds outside tools falls outside containment, and its output counts as agent-reported.
+**Containment.** A routine that reads untrusted input runs where all its tools come from Homing. A run that holds outside tools falls outside containment, and its output counts as agent-reported.
 
 **Housekeeping isn't a routine.** Indexing, deletion cascades and cache expiry are deterministic code. They use no connections, never publish and run under the same access rules; only narrowly defined housekeeping gets elevated database access ([architecture](architecture.md)). Anything that uses a connection or interprets content with a model, including upkeep, is a routine with an owner. Embeddings follow the space's model setting.
 
@@ -284,7 +284,7 @@ One `context` call gives an agent what it needs to start: the rules that apply, 
 
 Full details are available on demand.
 
-- **Resolve, then assemble.** `context` takes a free-text request and, optionally, a space. Without a space, Hivemind works out the people, messages, records and topics involved, using the same matching as routing. If several spaces fit, it returns the candidates.
+- **Resolve, then assemble.** `context` takes a free-text request and, optionally, a space. Without a space, Homing works out the people, messages, records and topics involved, using the same matching as routing. If several spaces fit, it returns the candidates.
 - **Local assembly never waits on external systems.** Guidance, overviews and indexed knowledge are assembled locally. Live lookups, such as external records or sources not yet indexed, go through `search` and `read`, or run under a strict time limit. The two are measured separately.
 - **Retrieval uses structure but doesn't depend on it.** Candidates come from links and from content search in parallel and are ranked together, so retrieval still works when links are missing or wrong. Access is a filter, never a ranking signal. Relevance ranks first, and relationships, authority, freshness, closeness of the space and recency adjust it. Archived spaces and pages and superseded items are left out unless the request is about them or about the past.
 - **Untrusted content is marked,** for example a client's email.
@@ -320,24 +320,24 @@ More about the tools:
 
 **Clients.**
 
-- There are three levels of integration: MCP only, which works whenever the client calls the tools; MCP plus one recommended instruction, which is more consistent; and native integration, where context loads reliably and sessions are captured through hooks. The recommended instruction is part of Hivemind's MCP instructions, so clients that show those follow it without setup.
-- With native integration, Hivemind learns from conversations automatically unless you say "don't keep this". Otherwise it learns through `remember`. It keeps the knowledge, not the transcript, and background learning never depends on the chat client.
+- There are three levels of integration: MCP only, which works whenever the client calls the tools; MCP plus one recommended instruction, which is more consistent; and native integration, where context loads reliably and sessions are captured through hooks. The recommended instruction is part of Homing's MCP instructions, so clients that show those follow it without setup.
+- With native integration, Homing learns from conversations automatically unless you say "don't keep this". Otherwise it learns through `remember`. It keeps the knowledge, not the transcript, and background learning never depends on the chat client.
 - Space detection is a suggestion that asks when unsure. Git remotes are hints. There is no hidden "current space".
-- Hivemind requires no repository structure, local workspace or separate chat app. Prompts and MCP Apps are enhancements.
-- Claude.ai and ChatGPT connect over OAuth to a public HTTPS address, so Hivemind acts as an authorization server or delegates to an identity provider. An install reachable only locally needs a tunnel to serve them.
+- Homing requires no repository structure, local workspace or separate chat app. Prompts and MCP Apps are enhancements.
+- Claude.ai and ChatGPT connect over OAuth to a public HTTPS address, so Homing acts as an authorization server or delegates to an identity provider. An install reachable only locally needs a tunnel to serve them.
 
 ## 11. Models, distribution and other instances
 
-Hivemind works without an AI model, and learns in the background when it has one. It is open source, self-hosted first, and can work with other Hivemind instances.
+Homing works without an AI model, and learns in the background when it has one. It is open source, self-hosted first, and can work with other Homing instances.
 
 **Rules are code; models interpret.** Permissions, inheritance, publishing, storage, search, identity matching and applying upkeep are plain code. Extracting knowledge, proposing upkeep, ambiguous routing and part of contradiction detection use a model.
 
 **The model is optional.**
 
-- The core works without one. Guidance and context are deterministic, knowledge is read and written through MCP, search needs no embeddings, and people and external agents keep knowledge up to date. Without a model, Hivemind learns only through agents.
-- Setup asks one question: which provider should Hivemind use for background learning (Claude, OpenAI, a local model…)? Cost and data-handling controls are part of that setup. A deployment sets a default, and a space can override it, for example with "no model processing".
+- The core works without one. Guidance and context are deterministic, knowledge is read and written through MCP, search needs no embeddings, and people and external agents keep knowledge up to date. Without a model, Homing learns only through agents.
+- Setup asks one question: which provider should Homing use for background learning (Claude, OpenAI, a local model…)? Cost and data-handling controls are part of that setup. A deployment sets a default, and a space can override it, for example with "no model processing".
 - Identifier matching runs before any model, so a source that matches a space with no model processing is never sent to one. A source from an unknown sender is processed under the setting of the space where it lands, usually your personal space.
-- "No model processing" governs only Hivemind's own inference, not what external assistants do. Self-hosting doesn't keep data local if the model is an external API. Setup states both limits plainly.
+- "No model processing" governs only Homing's own inference, not what external assistants do. Self-hosting doesn't keep data local if the model is an external API. Setup states both limits plainly.
 
 **Capabilities are independent.** Each one adds to the core, and none depends on another.
 
@@ -355,7 +355,7 @@ Hivemind works without an AI model, and learns in the background when it has one
 | Approach | Status |
 |---|---|
 | Several MCP servers in one assistant, each instance separate | Works in v1 |
-| Your Hivemind as a gateway: connect another instance once, then search, context and records work across both, with no syncing | The goal, later |
+| Your Homing as a gateway: connect another instance once, then search, context and records work across both, with no syncing | The goal, later |
 | True federation: instances synchronize knowledge, identities and updates | Postponed, if ever |
 
 When instances work together:
@@ -370,7 +370,7 @@ When instances work together:
 To run before building more than is needed.
 
 0. **Small items vs. a plain wiki.** Feed the same sources over simulated weeks into a plain agent-maintained wiki and into pages of small, sourced items kept by the upkeep operations. Compare correctness, staleness, drift, traceability and cost. Add structure only where it wins.
-1. **MCP reliability.** How consistently Claude and ChatGPT call Hivemind on realistic prompts, with MCP only and with one recommended instruction.
+1. **MCP reliability.** How consistently Claude and ChatGPT call Homing on realistic prompts, with MCP only and with one recommended instruction.
 2. **Tool design.** Whether agents build `act` payloads correctly compared with dedicated tools, and whether they choose correctly between `remember` and `act`.
 3. **Context size.** Core only, core plus relevant summaries, and core plus full pages, compared on quality, number of calls, latency and tokens.
 4. **Retrieval.** Links plus full-text search, with and without semantic search, with row-level security on.

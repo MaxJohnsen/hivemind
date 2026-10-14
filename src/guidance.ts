@@ -70,7 +70,7 @@ export async function removeRule(s: Session, ruleId: string): Promise<boolean> {
  * The rules that apply in a space, from least to most specific: the
  * viewer's personal guidance first, then each space from the top of the
  * tree down, with private rules after shared ones in the same space.
- * Hivemind doesn't judge whether two rules contradict each other. The agent
+ * Homing doesn't judge whether two rules contradict each other. The agent
  * does, by this order.
  */
 export async function rulesFor(s: Session, spaceId: string): Promise<Rule[]> {

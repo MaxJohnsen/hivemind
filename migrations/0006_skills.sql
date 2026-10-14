@@ -52,4 +52,4 @@ begin
 end
 $$;
 
-grant insert (path) on content to hivemind_app;
+grant insert (path) on content to homing_app;

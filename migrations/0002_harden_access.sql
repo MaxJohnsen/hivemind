@@ -20,7 +20,7 @@ begin
   if me is null then
     raise exception 'only a person can create a space' using errcode = 'insufficient_privilege';
   end if;
-  perform pg_advisory_xact_lock(hashtext('hivemind.space_access'));
+  perform pg_advisory_xact_lock(hashtext('homing.space_access'));
 
   if create_space.parent_id is not null then
     if not exists (
@@ -47,7 +47,7 @@ returns void
 language plpgsql security definer set search_path = public, pg_temp
 as $$
 begin
-  perform pg_advisory_xact_lock(hashtext('hivemind.space_access'));
+  perform pg_advisory_xact_lock(hashtext('homing.space_access'));
   if not exists (
     select from space_access a
     where a.space_id = space and a.person_id = current_person_id() and a.admin
@@ -70,7 +70,7 @@ returns void
 language plpgsql security definer set search_path = public, pg_temp
 as $$
 begin
-  perform pg_advisory_xact_lock(hashtext('hivemind.space_access'));
+  perform pg_advisory_xact_lock(hashtext('homing.space_access'));
   if person is distinct from current_person_id() and not exists (
     select from space_access a
     where a.space_id = space and a.person_id = current_person_id() and a.admin

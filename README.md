@@ -1,8 +1,8 @@
-# Hivemind
+# Homing
 
 AI assistants are good at helping with a single task. They are bad at knowing your work: which project you're in, how things are done there, what was decided last week. That understanding ends up scattered across folders, chats and tools, and every assistant starts from scratch.
 
-Hivemind is an open-source home for that working context, designed to work with whichever assistant you use.
+Homing is an open-source home for that working context, designed to work with whichever assistant you use.
 
 ## Why
 
@@ -24,23 +24,23 @@ Your work is organized into spaces: a client, a project, a team, a family. A spa
 
 Every space has a shared side for its members and a private side for each of them. Agents learn on your private side automatically. Nothing reaches other people unless that sharing is authorized, and only people can change the rules agents follow.
 
-> Hivemind learns automatically, shares deliberately, and changes behavior consciously.
+> Homing learns automatically, shares deliberately, and changes behavior consciously.
 
-Agents connect over MCP, so Hivemind is designed to work from Claude, ChatGPT, Copilot or Claude Code. It runs on your own server, and it is useful without an AI model of its own. Connecting one lets it learn in the background.
+Agents connect over MCP, so Homing is designed to work from Claude, ChatGPT, Copilot or Claude Code. It runs on your own server, and it is useful without an AI model of its own. Connecting one lets it learn in the background.
 
 ## An example
 
 You're a consultant working with three clients. On Monday you ask your assistant to plan the week. It combines the deadlines in each client's task system with your calendar, personal commitments included, and drafts a plan only you can see.
 
-Later, a client moves a launch date. Hivemind learns about it on your private side and asks whether the project should know. You say yes, and your colleague's assistant now works from the new date too. Your personal plans and your other clients stay private.
+Later, a client moves a launch date. Homing learns about it on your private side and asks whether the project should know. You say yes, and your colleague's assistant now works from the new date too. Your personal plans and your other clients stay private.
 
 ## Status
 
-Hivemind is being designed and built in the open. The concept and the specification are written, and work on the first increment has begun: spaces, guidance and knowledge over MCP, with no AI model needed. Progress is tracked in the [milestone](https://github.com/MaxJohnsen/hivemind/milestone/1).
+Homing is being designed and built in the open. The concept and the specification are written, and work on the first increment has begun: spaces, guidance and knowledge over MCP, with no AI model needed. Progress is tracked in the [milestone](https://github.com/MaxJohnsen/homing/milestone/1).
 
 ## Read more
 
-- [Concept](docs/concept.md): how Hivemind works, in plain language. Start here.
+- [Concept](docs/concept.md): how Homing works, in plain language. Start here.
 - [Specification](docs/spec.md): the guarantees and the detailed behavior.
 - [Architecture](docs/architecture.md): how it is built.
 - [Design](docs/design.md): how its screens look and behave.

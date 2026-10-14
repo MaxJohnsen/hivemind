@@ -1,4 +1,4 @@
-// Sets up people, spaces, tokens, rules and skills, until Hivemind has
+// Sets up people, spaces, tokens, rules and skills, until Homing has
 // sign-in and a web app. Everything here is a person editing directly.
 
 import { connect, withPrincipal } from './db.ts';

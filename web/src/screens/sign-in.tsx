@@ -32,10 +32,10 @@ export function SignIn({ connecting, initial = 'email' }: { connecting?: string;
             <img src={bird} alt="" width={300} height={250} className="pointer-events-none absolute right-6 -top-[71px] w-24" />
             <div className="flex flex-col gap-1.5">
               <h1 className="text-[28px] leading-tight font-semibold tracking-tight">
-                {connecting ? `Sign in to connect ${connecting}` : 'Sign in to Hivemind'}
+                {connecting ? `Sign in to connect ${connecting}` : 'Sign in to Homing'}
               </h1>
               {connecting && step === 'email' && (
-                <p className="text-[15px] text-muted-foreground">Then you choose whether {connecting} may use Hivemind as you.</p>
+                <p className="text-[15px] text-muted-foreground">Then you choose whether {connecting} may use Homing as you.</p>
               )}
             </div>
 
@@ -55,7 +55,7 @@ export function SignIn({ connecting, initial = 'email' }: { connecting?: string;
                   <Button variant="outline" size="lg" className="h-11 w-full text-[15px]"><GoogleLogo />Continue with Google</Button>
                   <Button variant="outline" size="lg" className="h-11 w-full text-[15px]"><MicrosoftLogo />Continue with Microsoft</Button>
                 </div>
-                <p className="text-sm text-muted-foreground">New here? You join through an invite from someone who uses Hivemind.</p>
+                <p className="text-sm text-muted-foreground">New here? You join through an invite from someone who uses Homing.</p>
               </>
             ) : (
               <>
@@ -97,7 +97,7 @@ export function SignIn({ connecting, initial = 'email' }: { connecting?: string;
         <div className="flex max-w-md flex-col gap-3 text-center">
           <p className="text-2xl leading-snug font-semibold tracking-tight text-balance">A home for everything worth knowing.</p>
           <p className="text-[15px] leading-relaxed text-pretty text-muted-foreground">
-            Hivemind brings together what you and your AI assistants learn, keeps it useful as life and work evolve, and lets you share it with the people who matter.
+            Homing brings together what you and your AI assistants learn, keeps it useful as life and work evolve, and lets you share it with the people who matter.
           </p>
         </div>
       </aside>

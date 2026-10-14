@@ -5,8 +5,8 @@ import { connect, type Sql } from './db.ts';
 import { mcpServer } from './mcp.ts';
 import { authenticate, type AgentPrincipal } from './tokens.ts';
 
-/** Where Hivemind is reached, which decides the host names it answers to. */
-export const publicUrl = new URL(process.env.HIVEMIND_URL ?? 'http://localhost:4100');
+/** Where Homing is reached, which decides the host names it answers to. */
+export const publicUrl = new URL(process.env.HOMING_URL ?? 'http://localhost:4100');
 
 /** Serves MCP at /mcp. Every request needs a valid token. */
 export function startServer(sql: Sql, options: { port: number; host?: string }): Promise<Server> {
@@ -46,5 +46,5 @@ export function startServer(sql: Sql, options: { port: number; host?: string }):
 if (import.meta.main) {
   const port = Number(process.env.PORT ?? 4100);
   await startServer(connect(), { port, host: process.env.HOST ?? '127.0.0.1' });
-  console.log(`Hivemind is serving MCP at ${new URL('/mcp', publicUrl)}`);
+  console.log(`Homing is serving MCP at ${new URL('/mcp', publicUrl)}`);
 }

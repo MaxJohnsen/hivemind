@@ -8,7 +8,7 @@ on:
     types: [published]
 
 env:
-  IMAGE: ghcr.io/maxjohnsen/hivemind
+  IMAGE: ghcr.io/maxjohnsen/homing
 
 jobs:
   image:

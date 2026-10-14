@@ -16,13 +16,13 @@ export interface Session {
   principal: Principal;
 }
 
-/** The restricted role Hivemind uses for everything except migrations. */
+/** The restricted role Homing uses for everything except migrations. */
 export const databaseUrl =
-  process.env.DATABASE_URL ?? 'postgres://hivemind_app:hivemind_app@localhost:5442/hivemind';
+  process.env.DATABASE_URL ?? 'postgres://homing_app:homing_app@localhost:5442/homing';
 
 /** The admin role, used only to run migrations. */
 export const adminUrl =
-  process.env.DATABASE_ADMIN_URL ?? 'postgres://hivemind:hivemind@localhost:5442/hivemind';
+  process.env.DATABASE_ADMIN_URL ?? 'postgres://homing:homing@localhost:5442/homing';
 
 export function connect(url = databaseUrl): Sql {
   return postgres(url, { transform: postgres.camel, onnotice: () => {} });
@@ -30,7 +30,7 @@ export function connect(url = databaseUrl): Sql {
 
 /**
  * Runs fn in a transaction as the principal. Row-level security in
- * PostgreSQL reads the same principal, so it applies even where Hivemind's
+ * PostgreSQL reads the same principal, so it applies even where Homing's
  * own checks are missing.
  */
 export async function withPrincipal<T>(
@@ -43,16 +43,16 @@ export async function withPrincipal<T>(
   const direct = 'person' in principal && principal.direct ? 'true' : '';
   return (await sql.begin(async (tx) => {
     await tx`
-      select set_config('hivemind.person_id', ${person}, true),
-             set_config('hivemind.space_id', ${space}, true),
-             set_config('hivemind.agent', ${principal.agent ?? ''}, true),
-             set_config('hivemind.direct', ${direct}, true)
+      select set_config('homing.person_id', ${person}, true),
+             set_config('homing.space_id', ${space}, true),
+             set_config('homing.agent', ${principal.agent ?? ''}, true),
+             set_config('homing.direct', ${direct}, true)
     `;
     return fn({ tx, principal });
   })) as T;
 }
 
-/** Hivemind refused an operation the principal isn't allowed to perform. */
+/** Homing refused an operation the principal isn't allowed to perform. */
 export class AccessDenied extends Error {
   override name = 'AccessDenied';
 }

@@ -77,7 +77,7 @@ test('a page’s title is shown only to those who can see it', async () => {
   });
 
   // Cara sees the shared item, but not the title Ana gave the page privately.
-  // Hivemind hides it on its own too, without row-level security.
+  // Homing hides it on its own too, without row-level security.
   for (const sql of [db, admin]) {
     const seen = await as(cara, (s) => readPage(s, page), sql);
     assert.equal(seen?.title, 'Untitled');
@@ -149,7 +149,7 @@ test('replacing a shared item privately changes only your own view', async () =>
   assert.deepEqual(await seenBy(cara), ['Cara expects the launch to move to April']);
   assert.deepEqual(await seenBy(claude), ['Acme launches on 1 March']);
 
-  // Hivemind keeps Cara's view to herself on its own too, without row-level security.
+  // Homing keeps Cara's view to herself on its own too, without row-level security.
   assert.deepEqual(await seenBy(claude, admin), ['Acme launches on 1 March']);
 
   // Cara can see that her colleagues still see the earlier version.

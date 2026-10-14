@@ -1,6 +1,6 @@
 # Design
 
-How Hivemind's screens look and behave. People work with Hivemind through their assistant, and open its pages to sign in, to decide something and, later, to browse and edit. Every screen follows this page.
+How Homing's screens look and behave. People work with Homing through their assistant, and open its pages to sign in, to decide something and, later, to browse and edit. Every screen follows this page.
 
 ## Principles
 
@@ -8,7 +8,7 @@ How Hivemind's screens look and behave. People work with Hivemind through their 
 - One job per page, with one obvious main action.
 - Never more than needed, always enough to finish.
 - A decision shows the exact change word for word, set apart from the rest, with who wants it and where it applies.
-- Everyday words: "Claude wants to use Hivemind as you", never OAuth, scope or client.
+- Everyday words: "Claude wants to use Homing as you", never OAuth, scope or client.
 - Anything that shares or removes says what will happen before you confirm.
 - It works on a phone, with a keyboard and with a screen reader, to WCAG 2.2 AA.
 - Quietly polished. The interface does the work, and illustrations give it character.
@@ -16,9 +16,9 @@ How Hivemind's screens look and behave. People work with Hivemind through their 
 ## Tagline
 
 > **A home for everything worth knowing.**
-> Hivemind brings together what you and your AI assistants learn, keeps it useful as life and work evolve, and lets you share it with the people who matter.
+> Homing brings together what you and your AI assistants learn, keeps it useful as life and work evolve, and lets you share it with the people who matter.
 
-The headline never mentions AI, so the sentence under it goes with it wherever someone meets Hivemind for the first time.
+The headline never mentions AI, so the sentence under it goes with it wherever someone meets Homing for the first time.
 
 ## Look
 
@@ -37,11 +37,11 @@ Linen backgrounds, sage for actions and peach for what's only yours. Light only 
 | `change` | `#EEF3EC` | The exact change being decided |
 | `wash` | `#E9A98F` | Peach, for small accents |
 
-Hivemind is a wordmark in Figtree for now; a logo comes later. Figtree is the only typeface, and it ships with the app. Page titles are 24 px, the exact change 18 px, body text 15 px, secondary text 13 to 14 px and labels 12 px. Corners start at 14 px, and buttons and fields are pills.
+Homing is a wordmark in Figtree for now; a logo comes later. Figtree is the only typeface, and it ships with the app. Page titles are 24 px, the exact change 18 px, body text 15 px, secondary text 13 to 14 px and labels 12 px. Corners start at 14 px, and buttons and fields are pills.
 
 ## Components
 
-[shadcn/ui](https://ui.shadcn.com) in its Maia style, on [Base UI](https://base-ui.com), lives in `web/src/components/ui` and takes its colors from the tokens in `web/src/styles.css`. Add one with `npx shadcn@latest add <name>` from the repository root. Hivemind's own components sit next to it: the wordmark, the proposed change, "Only you", where a rule applies, and the rules that already apply.
+[shadcn/ui](https://ui.shadcn.com) in its Maia style, on [Base UI](https://base-ui.com), lives in `web/src/components/ui` and takes its colors from the tokens in `web/src/styles.css`. Add one with `npx shadcn@latest add <name>` from the repository root. Homing's own components sit next to it: the wordmark, the proposed change, "Only you", where a rule applies, and the rules that already apply.
 
 - One primary button per view, for the main action. Everything else is an outline button.
 - Main buttons on pages are 44 px tall and fill the width on a phone, with the main action on top.
@@ -58,11 +58,11 @@ Hivemind is a wordmark in Figtree for now; a logo comes later. Figtree is the on
 
 ## Illustrations
 
-Every drawing says something about Hivemind, with the same few objects:
+Every drawing says something about Homing, with the same few objects:
 
 | Concept | Drawn as |
 |---|---|
-| An assistant | The paper bird, Hivemind's mascot. It carries what it learned to where it belongs |
+| An assistant | The paper bird, Homing's mascot. It carries what it learned to where it belongs |
 | A space | A box on a shelf |
 | Knowledge | Index cards |
 | Only yours | A closed notebook |

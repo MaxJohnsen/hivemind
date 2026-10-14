@@ -43,7 +43,7 @@ test('a rule reaches the spaces below, even for someone who can’t open the par
   });
 
   // Gunnar gets the rule, without the name of the space it comes from, and
-  // none of Acme's knowledge. Hivemind keeps to that without row-level security too.
+  // none of Acme's knowledge. Homing keeps to that without row-level security too.
   for (const sql of [db, admin]) {
     const rules = await as(gunnar, (s) => rulesFor(s, workshop), sql);
     assert.deepEqual(rules.map((rule) => [rule.kind, rule.spaceName, rule.body]), [

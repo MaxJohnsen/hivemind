@@ -29,7 +29,7 @@ test('membership flows down to child spaces, except into closed ones', async () 
 
   assert.deepEqual(await spacesSeenBy(ben), ['Personal', 'Acme', 'Website']);
 
-  // Access follows any change to the tree. Hivemind can't close a space yet,
+  // Access follows any change to the tree. Homing can't close a space yet,
   // so the admin role does it here.
   await admin`update spaces set closed = true where id = ${website}`;
   assert.deepEqual(await spacesSeenBy(ben), ['Personal', 'Acme']);
@@ -51,7 +51,7 @@ test('colleagues share the shared side, but not each other’s private side', as
   assert.deepEqual(await pageSeenBy(ana, launch), ['Acme launches on 1 March', 'Ana thinks the launch will slip']);
   assert.deepEqual(await pageSeenBy(cara, launch), ['Acme launches on 1 March', 'Cara is on leave in March']);
 
-  // Hivemind hides Ana's side on its own too, without row-level security.
+  // Homing hides Ana's side on its own too, without row-level security.
   assert.deepEqual(await pageSeenBy(cara, launch, admin), ['Acme launches on 1 March', 'Cara is on leave in March']);
 });
 

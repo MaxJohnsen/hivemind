@@ -1,14 +1,14 @@
 -- Spaces, membership and access.
 --
--- Hivemind connects as hivemind_app, a restricted role that is subject to
+-- Homing connects as homing_app, a restricted role that is subject to
 -- row-level security, and sets a principal (a person or a space) for each
 -- transaction. The policies below decide what that principal can see and
--- write, independently of the checks Hivemind makes itself.
+-- write, independently of the checks Homing makes itself.
 
 do $$
 begin
-  if not exists (select from pg_roles where rolname = 'hivemind_app') then
-    create role hivemind_app;
+  if not exists (select from pg_roles where rolname = 'homing_app') then
+    create role homing_app;
   end if;
 end
 $$;
@@ -17,11 +17,11 @@ $$;
 
 create function current_person_id() returns uuid
 language sql stable
-as $$ select nullif(current_setting('hivemind.person_id', true), '')::uuid $$;
+as $$ select nullif(current_setting('homing.person_id', true), '')::uuid $$;
 
 create function current_space_id() returns uuid
 language sql stable
-as $$ select nullif(current_setting('hivemind.space_id', true), '')::uuid $$;
+as $$ select nullif(current_setting('homing.space_id', true), '')::uuid $$;
 
 -- Tables
 
@@ -103,7 +103,7 @@ begin
     root := new.space_id;
   end if;
 
-  perform pg_advisory_xact_lock(hashtext('hivemind.space_access'));
+  perform pg_advisory_xact_lock(hashtext('homing.space_access'));
 
   delete from space_access where space_id in (select space_subtree(root));
 
@@ -138,7 +138,7 @@ for each row execute function refresh_space_access();
 
 -- Changing people, spaces and memberships
 --
--- hivemind_app can't write these tables directly. These functions check the
+-- homing_app can't write these tables directly. These functions check the
 -- caller's rights and make the change.
 
 create function create_person(name text, out person_id uuid, out personal_space_id uuid)
@@ -230,7 +230,7 @@ end
 $$;
 
 revoke execute on function create_person, create_space, add_member, remove_member from public;
-grant execute on function create_person, create_space, add_member, remove_member to hivemind_app;
+grant execute on function create_person, create_space, add_member, remove_member to homing_app;
 
 -- Row-level security
 
@@ -277,6 +277,6 @@ with check (
   )
 );
 
-grant select on people, spaces, memberships, space_access to hivemind_app;
+grant select on people, spaces, memberships, space_access to homing_app;
 -- Items never move between spaces or sides once written.
-grant select, insert, update (body, updated_at) on content to hivemind_app;
+grant select, insert, update (body, updated_at) on content to homing_app;

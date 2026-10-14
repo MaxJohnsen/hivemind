@@ -1,6 +1,6 @@
 -- Tokens let local agents such as Claude Code act for a person.
 --
--- Only a hash of each token is kept. Hivemind can't read this table: it
+-- Only a hash of each token is kept. Homing can't read this table: it
 -- checks a token with authenticate(), before it knows who is asking.
 
 create table tokens (
@@ -40,4 +40,4 @@ language sql stable security definer set search_path = public, pg_temp
 as $$ select t.person_id, t.agent from tokens t where t.hash = authenticate.hash $$;
 
 revoke execute on function create_token, revoke_tokens, authenticate from public;
-grant execute on function create_token, revoke_tokens, authenticate to hivemind_app;
+grant execute on function create_token, revoke_tokens, authenticate to homing_app;

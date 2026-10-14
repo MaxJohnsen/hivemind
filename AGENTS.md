@@ -4,12 +4,12 @@ Guidance for AI agents working in this repository.
 
 ## What this repository is
 
-Hivemind is being designed and built in the open. The documents describe it, and each one has a job:
+Homing is being designed and built in the open. The documents describe it, and each one has a job:
 
 - `README.md` makes people interested. It starts with the problem.
 - `docs/concept.md` explains the idea in plain language, without technology.
 - `docs/spec.md` defines the behavior and guarantees, without technology.
-- `docs/architecture.md` describes how Hivemind is built.
+- `docs/architecture.md` describes how Homing is built.
 - `docs/design.md` describes how its screens look and behave.
 
 Keep that separation. Implementation details never go in the concept or the spec.
@@ -24,7 +24,7 @@ This repository should read as if people wrote it for people.
 - Prefer short paragraphs. Use lists and tables only where they help, and don't open every bullet with a bold label.
 - Avoid em dashes.
 - Use American English.
-- Say what Hivemind is designed to do. Don't claim it works before it is built.
+- Say what Homing is designed to do. Don't claim it works before it is built.
 - Present conclusions, not the discussion that led to them.
 - Link any claim about another project to its source.
 
@@ -36,13 +36,13 @@ This repository should read as if people wrote it for people.
 - The cross-client leak test (guarantee 2) runs on every change. `npm run check` and `npm test` must pass; the tests need the database from `docker compose up -d db`.
 - A new table holding space data gets row-level security under the same access rule, and the leak test covers it.
 - Every screen follows `docs/design.md`. Agree on a new kind of screen with the maintainer before building it.
-- The plan can change. If using Hivemind shows a better order, adapt.
+- The plan can change. If using Homing shows a better order, adapt.
 
 ## How we test
 
-Tests show that Hivemind keeps its promises. A good test reads like a short story from the spec and fails only when something that matters breaks.
+Tests show that Homing keeps its promises. A good test reads like a short story from the spec and fails only when something that matters breaks.
 
-- Test behavior through Hivemind's own operations, against a real database. Don't mock Hivemind's code; fake only outside systems, at the edge.
+- Test behavior through Homing's own operations, against a real database. Don't mock Homing's code; fake only outside systems, at the edge.
 - Most tests are integration tests like that. Each issue's "Done when" becomes one end-to-end test through the real interface, such as an MCP client. Unit tests are for pure logic with many cases.
 - Name a test after the behavior it proves: "removing a member takes effect immediately".
 - Use one small cast and realistic data, so a leak would be obvious: Ana works for Acme, Ben for Beta, and Cara is Ana's colleague.
