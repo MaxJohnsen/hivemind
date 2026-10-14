@@ -25,10 +25,7 @@ export function Confirm({ proposal, initial = 'open' }: { proposal: Proposal; in
         <div className="flex flex-col gap-6 rounded-xl border bg-card p-6 sm:p-8">
           {state === 'open' ? (
             <>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm text-muted-foreground">{proposal.assistant} wants to add a rule</p>
-                <h1 className="text-2xl font-semibold tracking-tight">Add this rule to {proposal.space}?</h1>
-              </div>
+              <h1 className="text-2xl font-semibold tracking-tight">{proposal.assistant} wants to add a rule to {proposal.space}</h1>
               <ProposedChange kind={proposal.kind} text={proposal.text} />
               <RuleReach id="only-here" space={proposal.space} onlyHere={onlyHere} onOnlyHereChange={setOnlyHere} />
               <AlreadyApplies rules={proposal.alreadyApplies} precedence={proposal.precedence} />

@@ -4,6 +4,7 @@ How Hivemind's screens look and behave. People work with Hivemind through their 
 
 ## Principles
 
+- Every element says something. If it doesn't, it goes.
 - One job per page, with one obvious main action.
 - Never more than needed, always enough to finish.
 - A decision shows the exact change word for word, set apart from the rest, with who wants it and where it applies.
@@ -27,9 +28,9 @@ Linen backgrounds, sage for actions and peach for what's only yours. Light only 
 | `primary` | `#4F6F58` | Sage, the main action, with white text |
 | `private` | `#F8E3D8` on `#864530` | "Only you" |
 | `change` | `#EEF3EC` | The exact change being decided |
-| `wash` | `#E9A98F` | Peach, for small accents such as the wordmark dot |
+| `wash` | `#E9A98F` | Peach, for small accents |
 
-Figtree is the only typeface, and it ships with the app. Page titles are 24 px, the exact change 18 px, body text 15 px, secondary text 13 to 14 px and labels 12 px. Corners start at 14 px, and buttons and fields are pills.
+Hivemind is a wordmark in Figtree for now; a logo comes later. Figtree is the only typeface, and it ships with the app. Page titles are 24 px, the exact change 18 px, body text 15 px, secondary text 13 to 14 px and labels 12 px. Corners start at 14 px, and buttons and fields are pills.
 
 ## Components
 
@@ -39,6 +40,14 @@ Figtree is the only typeface, and it ships with the app. Page titles are 24 px, 
 - Main buttons on pages are 44 px tall and fill the width on a phone, with the main action on top.
 - "Only you" is always a label. Color supports it but never carries it alone.
 - A settled decision keeps showing the change, greyed, so it's clear what happened.
+- The change being decided is always shown in full, never cut short, because approving runs exactly what was shown. A short rule is set large; a longer one at reading size, keeping its line breaks.
+
+## Layout
+
+- The wordmark sits top left, the person's name top right.
+- Sign-in asks for the email first, then the passkey or password, and the email field offers saved passkeys directly. On a desktop the form is on the left and the illustration on the right, with one sentence about Hivemind; on a phone only the form shows, starting near the top.
+- Sign-in with Google or Microsoft uses the providers' own marks, as their guidelines ask.
+- Decision pages are one centered column with a single heading that says who wants what, where.
 
 ## Illustrations
 
@@ -50,7 +59,7 @@ Each one is generated with an image model from the same style, so they look like
 
 ## The approval card
 
-Inside Claude and ChatGPT the approval card takes the host's colors, font and corners, and keeps sage for the main action. It uses the same components as the confirmation page and is built as one self-contained HTML file.
+Inside Claude and ChatGPT the approval card takes the host's colors, font and corners, and keeps sage for the main action. In a dark host the sage turns lighter and more saturated, so the main action never looks disabled. It uses the same components as the confirmation page and is built as one self-contained HTML file.
 
 ## Working on screens
 

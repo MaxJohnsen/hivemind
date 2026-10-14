@@ -32,11 +32,12 @@
   --wash: #e9a98f;
 }
 
-/* In a dark host, sage gets lighter so it still reads, and the change block darkens with the host. */
+/* In a dark host, sage gets lighter and a little more saturated so the main action stands out,
+   and the change block darkens with the host. */
 :root[data-theme="dark"] {
-  --primary: #7fa58a;
-  --primary-foreground: #12201a;
-  --ring: #7fa58a;
+  --primary: #8fc29c;
+  --primary-foreground: #0f1d14;
+  --ring: #8fc29c;
   --private: #4a2c22;
   --private-foreground: #f3c7b3;
   color-scheme: dark;

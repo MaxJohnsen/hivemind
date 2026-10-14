@@ -1,7 +1,7 @@
 import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Wordmark } from '@/components/wordmark';
-import { proposal } from '@/sample';
+import { longProposal, proposal } from '@/sample';
 import { CardPreview } from '@/screens/card-preview';
 import { Confirm } from '@/screens/confirm';
 import { SignIn } from '@/screens/sign-in';
@@ -11,12 +11,15 @@ import './styles.css';
 const screens: Record<string, { label: string; render: () => ReactNode }> = {
   '/sign-in': { label: 'Sign in', render: () => <SignIn /> },
   '/sign-in/connect': { label: 'Sign in to connect Claude', render: () => <SignIn connecting="Claude" /> },
-  '/sign-in/email': { label: 'Sign in with email', render: () => <SignIn initial="email" /> },
-  '/sign-in/wrong': { label: 'Wrong password', render: () => <SignIn initial="wrong" /> },
+  '/sign-in/passkey': { label: 'Sign in: passkey', render: () => <SignIn initial="passkey" /> },
+  '/sign-in/password': { label: 'Sign in: password', render: () => <SignIn initial="password" /> },
+  '/sign-in/wrong': { label: 'Sign in: wrong password', render: () => <SignIn initial="wrong" /> },
   '/confirm': { label: 'Confirm a rule', render: () => <Confirm proposal={proposal} /> },
+  '/confirm/long': { label: 'Confirm a longer rule', render: () => <Confirm proposal={longProposal} /> },
   '/confirm/added': { label: 'Rule added', render: () => <Confirm proposal={proposal} initial="added" /> },
   '/confirm/declined': { label: 'Rule not added', render: () => <Confirm proposal={proposal} initial="declined" /> },
   '/card-preview': { label: 'Approval card in Claude and ChatGPT', render: () => <CardPreview /> },
+  '/card-preview/long': { label: 'Approval card with a longer rule', render: () => <CardPreview sample="long" /> },
 };
 
 function Index() {

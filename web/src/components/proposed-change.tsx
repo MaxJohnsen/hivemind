@@ -4,12 +4,25 @@ export type RuleKind = 'requirement' | 'preference';
 
 const kindLabel: Record<RuleKind, string> = { requirement: 'Requirement', preference: 'Preference' };
 
-/** The exact change someone is deciding on, word for word and set apart from everything around it. */
+/**
+ * The exact change someone is deciding on, word for word and set apart from everything around it.
+ * It is always shown in full, because approving runs exactly what was shown. A short rule is set
+ * large; a longer one at reading size, keeping its line breaks.
+ */
 export function ProposedChange({ kind, text, settled, className }: { kind: RuleKind; text: string; settled?: boolean; className?: string }) {
+  const long = text.length > 120 || text.includes('\n');
   return (
     <figure className={cn('flex flex-col gap-1.5 rounded-lg bg-change px-4 py-3.5', settled && 'bg-muted', className)}>
       <figcaption className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{kindLabel[kind]}</figcaption>
-      <blockquote className={cn('text-lg leading-snug font-medium', settled && 'text-muted-foreground')}>{text}</blockquote>
+      <blockquote
+        className={cn(
+          'max-w-prose whitespace-pre-line',
+          long ? 'text-[15px] leading-relaxed' : 'text-lg leading-snug font-medium',
+          settled && 'text-muted-foreground',
+        )}
+      >
+        {text}
+      </blockquote>
     </figure>
   );
 }
