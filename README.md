@@ -1,3 +1,5 @@
+<img src="docs/design/logo.svg" alt="" width="72">
+
 # Homing
 
 AI assistants are good at helping with a single task. They are bad at knowing your work: which project you're in, how things are done there, what was decided last week. That understanding ends up scattered across folders, chats and tools, and every assistant starts from scratch.

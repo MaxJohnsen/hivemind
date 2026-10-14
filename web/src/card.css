@@ -30,6 +30,10 @@
   --private-foreground: #864530;
   --change: color-mix(in oklab, #4f6f58 12%, var(--background));
   --wash: #e9a98f;
+
+  --mark-light: #93ae97;
+  --mark-dark: #4f6f58;
+  --mark-beak: #ea9b75;
 }
 
 /* In a dark host, sage gets lighter and a little more saturated so the main action stands out,
@@ -40,6 +44,8 @@
   --ring: #8fc29c;
   --private: #4a2c22;
   --private-foreground: #f3c7b3;
+  --mark-light: #b8d0bc;
+  --mark-dark: #8fc29c;
   color-scheme: dark;
 }
 

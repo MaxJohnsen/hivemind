@@ -33,5 +33,9 @@
   --private: #f8e3d8; /* "Only you", always with its label */
   --private-foreground: #864530;
   --change: #eef3ec; /* the exact change someone is deciding on */
-  --wash: #e9a98f; /* peach, for small accents such as the wordmark dot */
+  --wash: #e9a98f; /* peach, for small accents */
+
+  --mark-light: #93ae97; /* the folded bird */
+  --mark-dark: #4f6f58;
+  --mark-beak: #ea9b75;
 }
