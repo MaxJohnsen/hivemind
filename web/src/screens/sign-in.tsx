@@ -92,7 +92,12 @@ export function SignIn({ connecting, initial = 'email' }: { connecting?: string;
 
       <aside className="m-3 hidden flex-col items-center justify-center gap-8 rounded-3xl bg-muted px-12 py-16 lg:flex">
         <img src={welcome} alt="" width={1000} height={667} className="illustration w-full max-w-md" />
-        <p className="max-w-sm text-center text-xl leading-snug font-medium text-balance">Your assistants know your work. You decide what they share.</p>
+        <div className="flex max-w-md flex-col gap-3 text-center">
+          <p className="text-2xl leading-snug font-semibold tracking-tight text-balance">A home for everything worth knowing.</p>
+          <p className="text-[15px] leading-relaxed text-pretty text-muted-foreground">
+            Hivemind brings together what you and your AI assistants learn, keeps it useful as life and work evolve, and lets you share it with the people who matter.
+          </p>
+        </div>
       </aside>
     </div>
   );

@@ -13,6 +13,13 @@ How Hivemind's screens look and behave. People work with Hivemind through their 
 - It works on a phone, with a keyboard and with a screen reader, to WCAG 2.2 AA.
 - Quietly polished. The interface does the work, and illustrations give it character.
 
+## Tagline
+
+> **A home for everything worth knowing.**
+> Hivemind brings together what you and your AI assistants learn, keeps it useful as life and work evolve, and lets you share it with the people who matter.
+
+The headline never mentions AI, so the sentence under it goes with it wherever someone meets Hivemind for the first time.
+
 ## Look
 
 Linen backgrounds, sage for actions and peach for what's only yours. Light only for now; dark mode comes later through the same tokens.
@@ -45,7 +52,7 @@ Hivemind is a wordmark in Figtree for now; a logo comes later. Figtree is the on
 ## Layout
 
 - The wordmark sits top left, the person's name top right.
-- Sign-in asks for the email first, then the passkey or password, and the email field offers saved passkeys directly. On a desktop the form is on the left and the illustration on the right, with one sentence about Hivemind; on a phone only the form shows, starting near the top.
+- Sign-in asks for the email first, then the passkey or password, and the email field offers saved passkeys directly. On a desktop the form is on the left and the illustration on the right, with the tagline; on a phone only the form shows, starting near the top.
 - Sign-in with Google or Microsoft uses the providers' own marks, as their guidelines ask.
 - Decision pages are one centered column with a single heading that says who wants what, where.
 
