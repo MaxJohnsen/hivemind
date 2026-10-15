@@ -1,7 +1,11 @@
 import { randomBytes } from 'node:crypto';
+import { cimd } from '@better-auth/cimd';
+import { fetchClientMetadataResource } from '@better-auth/cimd/node';
+import { mcp } from '@better-auth/mcp';
 import { passkey } from '@better-auth/passkey';
 import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
+import { jwt } from 'better-auth/plugins';
 import type { Pool } from 'pg';
 import type { Sql } from './db.ts';
 import { acceptInvite, type Ticket } from './invites.ts';
@@ -15,15 +19,27 @@ export interface AuthSettings {
   passwords: boolean;
   /** Whether sign-in limits how often each client tries, by the address the server gives it. */
   rateLimit: boolean;
+  /**
+   * Fetches an assistant's client metadata document from its own site. Tests
+   * replace it, since that site is outside Homing.
+   */
+  fetchClientMetadata?: typeof fetchClientMetadataResource;
+  /**
+   * The sites whose assistants may connect, by the host of their client
+   * metadata document, or `*` for any. Each one can send people back to its
+   * own addresses, so Homing doesn't trust every site that publishes one.
+   */
+  assistantSites: string[];
 }
 
 /** Where the server puts the address a request comes from, for sign-in's rate limits. */
 export const clientAddressHeader = 'x-homing-client-address';
 
 /**
- * Sign-in and sessions, through Better Auth. It connects as homing_auth and
- * keeps its tables in the auth schema. Homing owns people: an account is
- * created only by accepting an invite, with a passkey, and gets its person's id.
+ * Sign-in, sessions and OAuth for assistants, through Better Auth. It
+ * connects as homing_auth and keeps its tables in the auth schema. Homing
+ * owns people: an account is created only by accepting an invite, with a
+ * passkey, and gets its person's id.
  */
 export function createAuth(sql: Sql, pool: Pool, settings: AuthSettings) {
   return betterAuth({
@@ -111,8 +127,32 @@ export function createAuth(sql: Sql, pool: Pool, settings: AuthSettings) {
           },
         },
       }),
+      // Signs the access tokens assistants use at /mcp.
+      jwt(),
+      mcp({
+        resource: mcpResource(settings.url),
+        loginPage: '/sign-in',
+        consentPage: '/connect',
+        // Nobody manages OAuth clients through the API, which the default
+        // allows any signed-in person to do. Assistants identify themselves
+        // with a client metadata document at their own address instead.
+        clientPrivileges: () => false,
+        // Sign-in names the assistant that sent you, from its signed request.
+        allowPublicClientPrelogin: true,
+      }),
+      cimd({
+        fetchClientMetadataResource: settings.fetchClientMetadata ?? fetchClientMetadataResource,
+        metadataProfile: 'mcp-2026-07-28',
+        isMetadataDocumentUrlAllowed: (clientId) =>
+          settings.assistantSites.includes('*') || settings.assistantSites.includes(new URL(clientId).hostname),
+      }),
     ],
   });
+}
+
+/** The address assistants connect to, which their tokens are for. */
+export function mcpResource(url: URL): string {
+  return new URL('/mcp', url).toString();
 }
 
 export type Auth = ReturnType<typeof createAuth>;
@@ -146,17 +186,30 @@ function code(error: unknown): string | undefined {
 }
 
 /**
- * The Better Auth endpoints Homing's pages use. The server answers only
- * these, so an upgrade can't quietly add a way into an account.
+ * The Better Auth endpoints Homing's pages and assistants use. The server
+ * answers only these, so an upgrade can't quietly add a way into an account.
  */
 export const authEndpoints = new Set([
-  'POST /sign-in/email',
-  'POST /sign-out',
-  'GET /passkey/generate-authenticate-options',
-  'POST /passkey/verify-authentication',
-  'GET /passkey/generate-register-options',
-  'POST /passkey/verify-registration',
-  'POST /passkey/delete-passkey',
+  'POST /api/auth/sign-in/email',
+  'POST /api/auth/sign-out',
+  'GET /api/auth/passkey/generate-authenticate-options',
+  'POST /api/auth/passkey/verify-authentication',
+  'GET /api/auth/passkey/generate-register-options',
+  'POST /api/auth/passkey/verify-registration',
+  'POST /api/auth/passkey/delete-passkey',
+  // Assistants find out how to connect, sign the person in and get tokens.
+  'GET /.well-known/oauth-protected-resource/mcp',
+  'GET /.well-known/oauth-protected-resource',
+  'GET /.well-known/oauth-authorization-server/api/auth',
+  'GET /api/auth/.well-known/oauth-authorization-server',
+  'GET /api/auth/.well-known/openid-configuration',
+  'GET /api/auth/jwks',
+  'GET /api/auth/oauth2/authorize',
+  'POST /api/auth/oauth2/public-client-prelogin',
+  'GET /api/auth/oauth2/public-client',
+  'POST /api/auth/oauth2/consent',
+  'POST /api/auth/oauth2/token',
+  'POST /api/auth/oauth2/revoke',
 ]);
 
 interface Counter {

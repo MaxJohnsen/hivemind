@@ -18,7 +18,7 @@ import {
 } from './knowledge.ts';
 import { skillsFor } from './skills.ts';
 import { listSpaces, peopleNames, type Space } from './spaces.ts';
-import type { AgentPrincipal } from './tokens.ts';
+import type { AgentPrincipal } from './assistants.ts';
 
 const instructions = `Homing holds the user's working context: their spaces, such as clients and projects, and what is known in each.
 

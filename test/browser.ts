@@ -13,10 +13,15 @@ export class Browser {
     this.passkeys = new Authenticator(url.origin);
   }
 
+  /** The browser's cookies, as it sends them. */
+  cookieHeader(): string {
+    return [...this.cookies].map(([name, value]) => `${name}=${value}`).join('; ');
+  }
+
   async fetch(path: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers);
     headers.set('origin', this.url.origin);
-    if (this.cookies.size) headers.set('cookie', [...this.cookies].map(([name, value]) => `${name}=${value}`).join('; '));
+    if (this.cookies.size) headers.set('cookie', this.cookieHeader());
     if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
     const response = await fetch(new URL(path, this.url), { ...init, headers, redirect: 'manual' });
     for (const cookie of response.headers.getSetCookie()) {

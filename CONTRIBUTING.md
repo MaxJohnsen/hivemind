@@ -30,21 +30,20 @@ Open the link to create your account with a passkey. It works once, for an hour;
 | `HOMING_SECRET` | Signs sessions: at least 32 random characters, such as from `openssl rand -base64 32`. Homing won't start without one, except when it listens only on localhost, as `npm test` does. Changing it signs everyone out |
 | `HOMING_PASSWORDS` | `off` turns off signing in with a password. Passkeys always work |
 | `HOMING_TRUSTED_PROXIES` | The reverse proxies in front of Homing, as addresses or ranges like `172.16.0.0/12`. Only their `X-Forwarded-For` counts for sign-in's rate limits; otherwise Homing uses the connection's own address |
+| `HOMING_ASSISTANT_SITES` | The sites whose assistants may connect, by the host of their client metadata document. Defaults to `claude.ai,chatgpt.com`; `*` allows any |
 
 ### Trying it with Claude Code
 
-Until Homing has sign-in, a small command-line tool sets up people, spaces, tokens, rules and skills. Each command prints what it creates, and `node src/cli.ts` lists them all.
+Until the web app can, a small command-line tool sets up spaces, rules and skills. Each command prints what it creates, and `node src/cli.ts` lists them all.
 
 ```sh
-docker compose up -d --build
-docker compose exec homing node src/cli.ts add-person "Your name"
+docker compose exec homing node src/cli.ts people   # your id
 docker compose exec homing node src/cli.ts add-space <your id> "A client"
-docker compose exec homing node src/cli.ts add-token <your id> "Claude Code"
 docker compose exec homing node src/cli.ts add-rule <your id> <space id> preference "Write reports in English"
-claude mcp add --transport http homing http://localhost:4100/mcp --header "Authorization: Bearer <token>"
+claude mcp add --transport http homing http://localhost:4100/mcp
 ```
 
-Then ask Claude Code to remember something for that client, and ask about it in a new session. Ask it to write a report for the client, and the rule comes with the context.
+The first time Claude Code connects, it opens Homing in your browser: sign in and allow it. Then ask Claude Code to remember something for that client, and ask about it in a new session. Ask it to write a report for the client, and the rule comes with the context. Your account page lists Claude Code, and disconnecting it there stops it at once.
 
 The command line acts as whoever you name, without sign-in, so treat it like the database password. An agent that can run commands on the same machine, such as Claude Code, can use it too, and can change guidance with it. Until Homing has sign-in, don't rely on "only people change guidance" there.
 

@@ -6,62 +6,54 @@
 
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
-import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { addRule } from '../src/guidance.ts';
 import { createPage, writeItem } from '../src/knowledge.ts';
 import { saveSkill } from '../src/skills.ts';
 import { startServer, type Homing } from '../src/server.ts';
 import { addMember, createSpace } from '../src/spaces.ts';
-import { createToken, revokeTokens } from '../src/tokens.ts';
 import { authDatabaseUrl } from '../src/db.ts';
-import { as, db, person } from './helpers.ts';
+import { Assistant, testAssistants } from './assistant.ts';
+import { as, db, member, type Member } from './helpers.ts';
 import { inTestDatabase } from './reset.ts';
 
 let homing: Homing;
-let url: URL;
 
 before(async () => {
-  homing = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase: inTestDatabase(authDatabaseUrl) });
-  url = new URL('/mcp', homing.url);
+  homing = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase: inTestDatabase(authDatabaseUrl), ...testAssistants });
 });
 
 after(() => homing.close());
 
-/** A new agent session for a person, like opening Claude Code. */
-async function session(token: string) {
-  const client = new Client({ name: 'test', version: '1.0.0' });
-  await client.connect(
-    new StreamableHTTPClientTransport(url, { requestInit: { headers: { authorization: `Bearer ${token}` } } }),
-  );
-  const call = async (name: string, args: Record<string, unknown>) => {
-    const result = await client.callTool({ name, arguments: args });
-    const text = result.content.map((block) => (block.type === 'text' ? block.text : '')).join('\n');
-    return { text, failed: Boolean(result.isError) };
-  };
-  return { call, close: () => client.close() };
+/** Someone's assistant, connected over OAuth after they allowed it. */
+async function connected(who: Member) {
+  const assistant = new Assistant(homing.url);
+  await assistant.connect(who.browser);
+  return assistant;
 }
 
-/** Ana and Cara work for Acme, and Ben for Beta. Each has Claude Code connected. */
+/** A new agent session for a person, like opening a new conversation. */
+const session = (assistant: Assistant) => assistant.open();
+
+/** Ana and Cara work for Acme, and Ben for Beta. Each has an assistant connected. */
 async function clients() {
-  const ana = await person('Ana');
-  const cara = await person('Cara');
-  const ben = await person('Ben');
+  const ana = await member(homing.url, 'Ana');
+  const cara = await member(homing.url, 'Cara');
+  const ben = await member(homing.url, 'Ben');
   const acme = await as(ana, async (s) => {
     const acme = await createSpace(s, { name: 'Acme' });
     await addMember(s, acme, cara.id);
     return acme;
   });
   await as(ben, (s) => createSpace(s, { name: 'Beta' }));
-  const token = (who: typeof ana) => as(who, (s) => createToken(s, 'Claude Code'));
-  return { ana, acme, acmeRef: `space:${acme}`, tokens: { ana: await token(ana), cara: await token(cara), ben: await token(ben) } };
+  return { ana, acme, acmeRef: `space:${acme}`, assistants: { ana: await connected(ana), cara: await connected(cara), ben: await connected(ben) } };
 }
 
 const refIn = (text: string, kind: string) => new RegExp(`${kind}:[0-9a-f-]{36}`).exec(text)?.[0];
 
 test('an agent saves knowledge, and a new session finds it again', async () => {
-  const { acmeRef, tokens } = await clients();
+  const { acmeRef, assistants } = await clients();
 
-  const first = await session(tokens.ana);
+  const first = await session(assistants.ana);
   const start = await first.call('context', { request: 'Gunnar says the Acme launch moves to 1 March' });
   assert.match(start.text, /^Picked Acme, because the request names it/);
   const saved = await first.call('remember', {
@@ -74,7 +66,7 @@ test('an agent saves knowledge, and a new session finds it again', async () => {
   const page = refIn(saved.text, 'page');
   await first.close();
 
-  const second = await session(tokens.ana);
+  const second = await session(assistants.ana);
   const context = await second.call('context', { request: 'When does Acme launch?', space: acmeRef });
   assert.ok(context.text.includes(page!));
   assert.match(context.text, /Acme launches on 1 March/);
@@ -88,19 +80,19 @@ test('an agent saves knowledge, and a new session finds it again', async () => {
 });
 
 test('nobody else can see it: not a colleague in the same space, nor another client', async () => {
-  const { acmeRef, tokens } = await clients();
-  const anas = await session(tokens.ana);
+  const { acmeRef, assistants } = await clients();
+  const anas = await session(assistants.ana);
   const saved = await anas.call('remember', { space: acmeRef, page: 'Launch', text: 'Acme launches on 1 March' });
   const page = refIn(saved.text, 'page');
   await anas.close();
 
-  const caras = await session(tokens.cara);
+  const caras = await session(assistants.cara);
   assert.doesNotMatch((await caras.call('context', { request: 'launch', space: acmeRef })).text, /1 March/);
   assert.equal((await caras.call('search', { query: 'launch' })).text, 'No matches.');
   assert.equal((await caras.call('read', { ref: page })).failed, true);
   await caras.close();
 
-  const bens = await session(tokens.ben);
+  const bens = await session(assistants.ben);
   assert.doesNotMatch((await bens.call('context', { request: 'Acme launch' })).text, /Acme/);
   assert.equal((await bens.call('search', { query: 'Acme launch' })).text, 'No matches.');
   assert.equal((await bens.call('remember', { space: acmeRef, page: 'Launch', text: 'Beta was here' })).failed, true);
@@ -108,8 +100,8 @@ test('nobody else can see it: not a colleague in the same space, nor another cli
 });
 
 test('small things without a subject go on the space’s notes, and evidence can wait for a page', async () => {
-  const { acmeRef, tokens } = await clients();
-  const anas = await session(tokens.ana);
+  const { acmeRef, assistants } = await clients();
+  const anas = await session(assistants.ana);
 
   const note = await anas.call('remember', { space: acmeRef, text: 'Ola will own the data migration' });
   assert.match(note.text, /the new page "Notes"/);
@@ -126,13 +118,13 @@ test('small things without a subject go on the space’s notes, and evidence can
 });
 
 test('replacing shared knowledge updates only your own view, and keeps the earlier version', async () => {
-  const { ana, acme, acmeRef, tokens } = await clients();
+  const { ana, acme, acmeRef, assistants } = await clients();
   const launch = await as({ ...ana, agent: 'Claude Code' }, async (s) => {
     const page = await createPage(s, { spaceId: acme, title: 'Launch', shared: true });
     return writeItem(s, { pageId: page, body: 'Acme launches on 1 March', shared: true });
   });
 
-  const anas = await session(tokens.ana);
+  const anas = await session(assistants.ana);
   const replaced = await anas.call('remember', { space: acmeRef, text: 'Acme launches on 1 April', replaces: `item:${launch.id}` });
   assert.match(replaced.text, /others in the space still see the earlier version/);
   const context = (await anas.call('context', { request: 'launch', space: acmeRef })).text;
@@ -141,19 +133,19 @@ test('replacing shared knowledge updates only your own view, and keeps the earli
   assert.match((await anas.call('read', { ref: `item:${launch.id}` })).text, /No longer true since/);
   await anas.close();
 
-  const caras = await session(tokens.cara);
+  const caras = await session(assistants.cara);
   assert.match((await caras.call('context', { request: 'launch', space: acmeRef })).text, /Acme launches on 1 March/);
   await caras.close();
 });
 
 test('remember never rewrites shared knowledge', async () => {
-  const { ana, acme, acmeRef, tokens } = await clients();
+  const { ana, acme, acmeRef, assistants } = await clients();
   const launch = await as({ ...ana, agent: 'Claude Code' }, async (s) => {
     const page = await createPage(s, { spaceId: acme, title: 'Launch', shared: true });
     return writeItem(s, { pageId: page, body: 'Acme launches on 1 March', shared: true });
   });
 
-  const anas = await session(tokens.ana);
+  const anas = await session(assistants.ana);
   const attempt = await anas.call('remember', { space: acmeRef, text: 'Acme launches in April', updates: `item:${launch.id}` });
   assert.equal(attempt.failed, true);
   assert.match(attempt.text, /can't rewrite shared knowledge/);
@@ -161,8 +153,8 @@ test('remember never rewrites shared knowledge', async () => {
 });
 
 test('a client’s rules reach a closed project below it, from least to most specific', async () => {
-  const ana = await person('Ana');
-  const gunnar = await person('Gunnar');
+  const ana = await member(homing.url, 'Ana');
+  const gunnar = await member(homing.url, 'Gunnar');
   const { acme, workshop } = await as({ ...ana, direct: true }, async (s) => {
     const acme = await createSpace(s, { name: 'Acme' });
     const workshop = await createSpace(s, { name: 'Workshop', parentId: acme, closed: true });
@@ -175,7 +167,7 @@ test('a client’s rules reach a closed project below it, from least to most spe
   });
 
   // Gunnar, from the client, is only in the workshop and can't open Acme.
-  const gunnars = await session(await as(gunnar, (s) => createToken(s, 'Claude Code')));
+  const gunnars = await session(await connected(gunnar));
   const context = (await gunnars.call('context', { request: 'Write the workshop report', space: `space:${workshop}` })).text;
   const rules = context
     .split('\n## ')
@@ -210,8 +202,8 @@ test('a client’s rules reach a closed project below it, from least to most spe
 });
 
 test('a client’s skills reach a project below it, and read back whole', async () => {
-  const ana = await person('Ana');
-  const gunnar = await person('Gunnar');
+  const ana = await member(homing.url, 'Ana');
+  const gunnar = await member(homing.url, 'Gunnar');
   const skillMd = (name: string, description: string) => `---\nname: ${name}\ndescription: ${description}\n---\n\nSteps\n`;
   const workshop = await as({ ...ana, direct: true }, async (s) => {
     const acme = await createSpace(s, { name: 'Acme' });
@@ -227,7 +219,7 @@ test('a client’s skills reach a project below it, and read back whole', async 
     return workshop;
   });
 
-  const gunnars = await session(await as(gunnar, (s) => createToken(s, 'Claude Code')));
+  const gunnars = await session(await connected(gunnar));
   const context = (await gunnars.call('context', { request: 'Write the workshop report', space: `space:${workshop}` })).text;
   const skills = context
     .split('\n## ')
@@ -250,24 +242,4 @@ test('a client’s skills reach a project below it, and read back whole', async 
   assert.equal(attempt.failed, true);
   assert.match(attempt.text, /Only people change guidance/);
   await gunnars.close();
-});
-
-test('only valid tokens are accepted, and revoked ones stop working', async () => {
-  const { ana, tokens } = await clients();
-  const status = async (authorization?: string) =>
-    (
-      await fetch(url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...(authorization && { authorization }) },
-        body: '{}',
-      })
-    ).status;
-
-  assert.equal(await status(), 401);
-  assert.equal(await status('Bearer hm_not-a-real-token'), 401);
-  assert.notEqual(await status(`Bearer ${tokens.ana}`), 401);
-
-  await as(ana, revokeTokens);
-  assert.equal(await status(`Bearer ${tokens.ana}`), 401);
-  await assert.rejects(as(ana, (s) => createToken(s, '')), { code: '23514' });
 });

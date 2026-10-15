@@ -39,6 +39,7 @@ services:
       # Required: Homing won't start without it. See CONTRIBUTING.
       HOMING_SECRET: ${HOMING_SECRET:-}
       HOMING_TRUSTED_PROXIES: ${HOMING_TRUSTED_PROXIES:-}
+      HOMING_ASSISTANT_SITES: ${HOMING_ASSISTANT_SITES:-}
     ports:
       - "127.0.0.1:${HOMING_PORT:-4100}:4100"
     depends_on:

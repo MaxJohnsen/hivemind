@@ -39,7 +39,7 @@ export const longProposal: Proposal = {
   precedence: 'Requirements always apply. If two requirements conflict, the assistant stops and tells you.',
 };
 
-// Ana's account, with a passkey on her laptop and one on her phone.
+// Ana's account, with a passkey on her laptop and one on her phone, and Claude connected.
 export const sampleAccount: AccountData = {
   name: 'Ana Berg',
   email: 'ana@acme.no',
@@ -48,4 +48,9 @@ export const sampleAccount: AccountData = {
     { id: 'mac', name: 'Mac', createdAt: '2026-10-14T09:12:00Z' },
     { id: 'iphone', name: 'iPhone', createdAt: '2026-10-15T18:40:00Z' },
   ],
+  assistants: [
+    { clientId: 'https://claude.ai/oauth/mcp-oauth-client-metadata', name: 'Claude', connectedAt: '2026-10-14T09:20:00Z' },
+    { clientId: 'https://chatgpt.com/oauth/client-metadata.json', name: 'ChatGPT', connectedAt: '2026-10-15T08:05:00Z' },
+  ],
+  mcpUrl: 'https://homing.acme.no/mcp',
 };

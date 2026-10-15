@@ -1,11 +1,11 @@
 import { startAuthentication, startRegistration, WebAuthnError } from '@simplewebauthn/browser';
-import { api } from '@/lib/api';
+import { api, oauthQuery } from '@/lib/api';
 
 /** Signs in with any passkey saved for Homing. With autofill, it waits for one picked in the email field. */
 export async function signInWithPasskey(options: { autofill?: boolean } = {}) {
   const optionsJSON = await api<Parameters<typeof startAuthentication>[0]['optionsJSON']>('/api/auth/passkey/generate-authenticate-options');
   const response = await startAuthentication({ optionsJSON, useBrowserAutofill: options.autofill });
-  return api<{ url?: string }>('/api/auth/passkey/verify-authentication', { response });
+  return api<{ url?: string }>('/api/auth/passkey/verify-authentication', { response, ...oauthQuery() });
 }
 
 /**

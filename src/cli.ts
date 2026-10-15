@@ -1,17 +1,15 @@
-// Sets up people, spaces, tokens, rules and skills, until Homing has
-// sign-in and a web app. Everything here is a person editing directly.
+// Sets up people, spaces, rules and skills, until Homing's web app and
+// assistants can. Everything here is a person editing directly.
 
-import { connect, withPrincipal } from './db.ts';
+import { authDatabaseUrl, connect, withPrincipal } from './db.ts';
 import { addRule, editRule, removeRule, rulesFor, type Rule, type RuleKind } from './guidance.ts';
 import { readSkillFolder, removeSkill, saveSkill, skillsFor } from './skills.ts';
 import { addMember, createPerson, createSpace, listSpaces, type Space } from './spaces.ts';
-import { createToken, revokeTokens } from './tokens.ts';
 
 const usage = `Usage: node src/cli.ts <command>
 
+  people                                  Everyone with an account, with their ids
   add-person <name>                       Prints the new person's id
-  add-token <person> <agent>              Prints a token for an agent, such as "Claude Code"
-  revoke-tokens <person>                  Revokes all of a person's tokens
   add-space <person> <name> [parent]      Prints the new space's id
   add-member <admin> <space> <person>
   spaces <person>
@@ -38,12 +36,18 @@ const as = <T>(person: string, fn: Parameters<typeof withPrincipal<T>>[2]) =>
   withPrincipal(sql, { person, direct: true }, fn);
 
 try {
-  if (command === 'add-person' && args.length === 1) {
+  if (command === 'people' && args.length === 0) {
+    // Only sign-in's own role can read accounts, which share their person's id.
+    const accounts = connect(authDatabaseUrl);
+    try {
+      for (const account of await accounts`select id, name, email from auth."user" order by "createdAt"`) {
+        console.log(`${account.id}  ${account.name} <${account.email}>`);
+      }
+    } finally {
+      await accounts.end();
+    }
+  } else if (command === 'add-person' && args.length === 1) {
     console.log((await createPerson(sql, args[0])).id);
-  } else if (command === 'add-token' && args.length === 2) {
-    console.log(await as(args[0], (s) => createToken(s, args[1])));
-  } else if (command === 'revoke-tokens' && args.length === 1) {
-    console.log(`Revoked ${await as(args[0], revokeTokens)} tokens.`);
   } else if (command === 'add-space' && (args.length === 2 || args.length === 3)) {
     console.log(await as(args[0], (s) => createSpace(s, { name: args[1], parentId: args[2] })));
   } else if (command === 'add-member' && args.length === 3) {
