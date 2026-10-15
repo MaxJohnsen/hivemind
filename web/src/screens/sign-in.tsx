@@ -80,7 +80,7 @@ export function SignIn({
             {connecting ? `Sign in to connect ${connecting}` : 'Sign in to Homing'}
           </h1>
           {connecting && step === 'email' && (
-            <p className="text-[15px] text-muted-foreground">Then you choose whether {connecting} may use Homing as you.</p>
+            <p className="text-[15px] text-muted-foreground">Then you choose whether to connect {connecting}.</p>
           )}
         </div>
 

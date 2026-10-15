@@ -9,7 +9,7 @@ export interface ConnectingAssistant {
   site: string;
 }
 
-/** Choosing whether an assistant may use Homing as you. */
+/** Choosing whether to connect an assistant, which then reads what you can see in Homing. */
 export function Connect({
   assistant,
   person,
@@ -40,20 +40,20 @@ export function Connect({
       <main className="mx-auto w-full max-w-xl px-4 pb-16">
         <div className="flex flex-col gap-6 rounded-xl border bg-card p-6 sm:p-8">
           <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-balance">{assistant.name} wants to use Homing as you</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-balance">Connect {assistant.name} to Homing?</h1>
             <p className="text-[15px] text-muted-foreground">
-              Allow it only if you are connecting from <span className="font-medium text-foreground">{assistant.site}</span>.
+              Connect it only if you came here from <span className="font-medium text-foreground">{assistant.site}</span>.
             </p>
           </div>
 
           <div className="flex flex-col gap-3 rounded-lg bg-change p-5 text-[15px]">
-            <p>{assistant.name} will be able to find and read everything you can see in Homing, and save what it learns where only you can see it.</p>
-            <p>It can't change rules, and it can't share anything with others.</p>
+            <p>{assistant.name} can read the knowledge you have access to, and save what it learns privately.</p>
+            <p>It can't change your rules or share knowledge through Homing.</p>
           </div>
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="outline" size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy} onClick={() => choose(false)}>Don't allow</Button>
-            <Button size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy} onClick={() => choose(true)}>Allow</Button>
+            <Button variant="outline" size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy} onClick={() => choose(false)}>Cancel</Button>
+            <Button size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy} onClick={() => choose(true)}>Connect {assistant.name}</Button>
           </div>
           {message && <FieldError>{message}</FieldError>}
           <p className="text-xs text-muted-foreground">You can disconnect it at any time from your account.</p>
