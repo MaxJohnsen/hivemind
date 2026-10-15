@@ -1,4 +1,6 @@
-import { McpServer } from '@modelcontextprotocol/server';
+import { readFile } from 'node:fs/promises';
+import { RESOURCE_MIME_TYPE, RESOURCE_URI_META_KEY, registerAppResource } from '@modelcontextprotocol/ext-apps/server';
+import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import postgres from 'postgres';
 import * as z from 'zod';
 import { AccessDenied, personOf, withPrincipal, type Session, type Sql } from './db.ts';
@@ -16,7 +18,7 @@ import {
   writeItem,
   type Hit,
 } from './knowledge.ts';
-import { openProposals, proposeRule, readProposal, type Proposal } from './proposals.ts';
+import { decide, openProposals, proposalData, proposeRule, readProposal, Undecidable, type Proposal } from './proposals.ts';
 import { skillsFor } from './skills.ts';
 import { listSpaces, peopleNames, type Space } from './spaces.ts';
 import type { AgentPrincipal } from './assistants.ts';
@@ -31,10 +33,18 @@ const instructions = `Homing holds the user's working context: their spaces, suc
 
 const text = () => z.string().trim().min(1);
 
-/** The MCP tools, for one person and their agent, at the Homing reached at url. */
-export function mcpServer(sql: Sql, principal: AgentPrincipal, url: URL): McpServer {
+/** The approval card, shown in the conversation by assistants that support MCP Apps. */
+const approvalCard = 'ui://homing/approval.html';
+
+/**
+ * The MCP tools, for one person and their agent, at the Homing reached at
+ * url. With card, the assistant is one Homing has checked keeps the model
+ * from operating the approval card, so the person can decide in the
+ * conversation.
+ */
+export function mcpServer(sql: Sql, principal: AgentPrincipal, url: URL, { card = false } = {}): McpServer {
   const server = new McpServer({ name: 'homing', version: process.env.HOMING_VERSION ?? 'dev' }, { instructions });
-  const answer = (fn: (s: Session) => Promise<string>) => respond(sql, principal, fn);
+  const answer = (fn: (s: Session) => Promise<string | Answer>) => respond(sql, principal, fn);
   const links: Links = { proposal: (id) => new URL(`/proposals/${id}`, url).toString() };
 
   server.registerTool(
@@ -142,11 +152,97 @@ export function mcpServer(sql: Sql, principal: AgentPrincipal, url: URL): McpSer
         }),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+      ...(card && { _meta: { ui: { resourceUri: approvalCard }, [RESOURCE_URI_META_KEY]: approvalCard } }),
     },
-    ({ input }) => answer((s) => proposeGuidance(s, links, input)),
+    ({ input }) => answer((s) => proposeGuidance(s, links, input, card)),
   );
 
+  if (card) {
+    // Only the card calls these. The assistant keeps the model from seeing
+    // them, which is why only assistants Homing has checked get them.
+    const onlyTheCard = { ui: { resourceUri: approvalCard, visibility: ['app'] } };
+
+    server.registerTool(
+      'approval',
+      {
+        title: 'Show a proposal',
+        description: 'The proposal the approval card shows, as it is now.',
+        inputSchema: z.object({ proposal: z.uuid() }),
+        annotations: { readOnlyHint: true },
+        _meta: onlyTheCard,
+      },
+      async ({ proposal }) => cardAnswer(sql, principal, proposal),
+    );
+
+    server.registerTool(
+      'decide',
+      {
+        title: 'Decide a proposal',
+        description: 'Approves or rejects a proposal, when the person presses a button on the approval card.',
+        inputSchema: z.object({
+          proposal: z.uuid(),
+          approve: z.boolean(),
+          shown: z.string().optional().describe('The rule as the card showed it, for a change or removal'),
+          onlyHere: z.boolean().optional(),
+        }),
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        _meta: onlyTheCard,
+      },
+      async ({ proposal, approve, shown, onlyHere }) => {
+        try {
+          // The person pressed the button, so it is their own decision, made in this assistant's card.
+          await withPrincipal(sql, { person: principal.person, direct: true }, (s) =>
+            decide(s, proposal, { approve, shown, onlyHere, decidedIn: principal.agent }),
+          );
+          return cardAnswer(sql, principal, proposal);
+        } catch (error) {
+          const message =
+            error instanceof Undecidable
+              ? error.message
+              : error instanceof AccessDenied || (error instanceof postgres.PostgresError && error.code === '42501')
+                ? 'You can’t make this change any more, so nothing changed.'
+                : undefined;
+          if (!message) throw error;
+          return { ...(await cardAnswer(sql, principal, proposal)), isError: true, content: [{ type: 'text' as const, text: message }] };
+        }
+      },
+    );
+
+    registerAppResource(
+      server,
+      'Approval card',
+      approvalCard,
+      { description: 'Shows a proposed change, for the person to approve or reject.' },
+      async () => ({ contents: [{ uri: approvalCard, mimeType: RESOURCE_MIME_TYPE, text: await cardHtml() }] }),
+    );
+  }
+
   return server;
+}
+
+/** A proposal as the card shows it, read as the person. */
+async function cardAnswer(sql: Sql, principal: AgentPrincipal, proposalId: string): Promise<CallToolResult> {
+  const view = await withPrincipal(sql, { person: principal.person }, (s) => readProposal(s, proposalId));
+  if (!view) return { isError: true, content: [{ type: 'text', text: 'There’s nothing for you to decide here.' }] };
+  const proposal = proposalData(view);
+  return { content: [{ type: 'text', text: `The proposal is ${proposal.state}.` }], structuredContent: { proposal } };
+}
+
+let cardFile: Promise<string> | undefined;
+
+/** The card's single HTML file, built with the web app. */
+function cardHtml(): Promise<string> {
+  cardFile ??= readFile(new URL('../web/dist/card/card.html', import.meta.url), 'utf8').catch((error: unknown) => {
+    cardFile = undefined;
+    throw new Error('The approval card is not built. Run `npm run build:web`.', { cause: error });
+  });
+  return cardFile;
+}
+
+/** A tool's answer: text for the model, and data for a card. */
+interface Answer {
+  text: string;
+  structuredContent?: Record<string, unknown>;
 }
 
 /** Addresses of Homing's own pages, which people open from the conversation. */
@@ -156,9 +252,11 @@ interface Links {
 
 const onlyPeople = 'Only people change guidance. To add, change or remove a rule, propose it with `act`, and the user approves it in Homing.';
 
-async function respond(sql: Sql, principal: AgentPrincipal, fn: (s: Session) => Promise<string>) {
+async function respond(sql: Sql, principal: AgentPrincipal, fn: (s: Session) => Promise<string | Answer>) {
   try {
-    return { content: [{ type: 'text' as const, text: await withPrincipal(sql, principal, fn) }] };
+    const answer = await withPrincipal(sql, principal, fn);
+    const { text, structuredContent } = typeof answer === 'string' ? { text: answer, structuredContent: undefined } : answer;
+    return { content: [{ type: 'text' as const, text }], ...(structuredContent && { structuredContent }) };
   } catch (error) {
     const message = refusal(error);
     if (!message) console.error(error);
@@ -439,7 +537,8 @@ async function proposeGuidance(
     shared?: boolean;
     onlyHere?: boolean;
   },
-): Promise<string> {
+  card: boolean,
+): Promise<Answer> {
   const spaceId = parseRef(input.space, 'space');
   let proposal: Proposal;
   if (input.change === 'add') {
@@ -455,11 +554,16 @@ async function proposeGuidance(
       proposal = await proposeRule(s, { action: 'remove rule', spaceId, ruleId });
     }
   }
-  return (
-    `Waiting for the user's approval (${ref('proposal', proposal.id)}). Nothing has changed yet. ` +
-    `Give them this link to approve or reject it in Homing: ${links.proposal(proposal.id)}\n\n` +
-    'Only they can decide it, so never say it is approved until `read` shows it is. Once it is, call `context` again for the rules as they are.'
-  );
+  const where = card
+    ? 'Homing shows them the exact change in a card here, to approve or reject. ' +
+      `If they can't see the card, give them this link instead: ${links.proposal(proposal.id)}`
+    : `Give them this link to approve or reject it in Homing: ${links.proposal(proposal.id)}`;
+  return {
+    text:
+      `Waiting for the user's approval (${ref('proposal', proposal.id)}). Nothing has changed yet. ${where}\n\n` +
+      'Only they can decide it, so never say it is approved until `read` shows it is. Once it is, call `context` again for the rules as they are.',
+    structuredContent: { proposal: proposal.id },
+  };
 }
 
 /** "Add a preference: "Write reports in Norwegian"", for an agent. */

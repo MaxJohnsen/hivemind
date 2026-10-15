@@ -118,13 +118,14 @@ export async function openProposals(s: Session, spaceId: string): Promise<Propos
  * that was shown, as the person deciding, so it needs their rights at that
  * moment. A change or removal names the rule's text as it was shown, and if
  * the rule has changed since, nothing happens and it must be shown again.
- * A new rule can be kept to its space while approving it.
+ * A new rule can be kept to its space while approving it. A decision made
+ * on a card in an assistant names it.
  * Returns undefined when there is no such proposal for this person.
  */
 export async function decide(
   s: Session,
   proposalId: string,
-  decision: { approve: boolean; shown?: string; onlyHere?: boolean },
+  decision: { approve: boolean; shown?: string; onlyHere?: boolean; decidedIn?: string },
 ): Promise<ProposalView | undefined> {
   const [proposal] = await s.tx<Proposal[]>`
     select ${columns(s)} from proposals where id = ${proposalId}::uuid and ${own(s)} for update
@@ -152,8 +153,38 @@ export async function decide(
       else await removeRule(s, rule.id);
     }
   }
-  await s.tx`update proposals set state = ${decision.approve ? 'approved' : 'rejected'} where id = ${proposalId}::uuid and ${own(s)}`;
+  await s.tx`
+    update proposals set state = ${decision.approve ? 'approved' : 'rejected'}, decided_in = ${decision.decidedIn ?? null}
+    where id = ${proposalId}::uuid and ${own(s)}
+  `;
   return readProposal(s, proposalId);
+}
+
+/** What the decision page and the card show: the exact change, where, and what already applies there. */
+export function proposalData(proposal: ProposalView) {
+  const action = ({ 'add rule': 'add', 'change rule': 'change', 'remove rule': 'remove' } as const)[proposal.action];
+  const rule = proposal.rule;
+  return {
+    id: proposal.id,
+    assistant: proposal.agent ?? 'Your assistant',
+    space: proposal.space.name,
+    personal: proposal.space.personal,
+    action,
+    kind: proposal.change.kind ?? rule?.kind ?? 'preference',
+    // The new rule, or the rule's new wording.
+    text: proposal.change.text ?? null,
+    // The rule a change or removal is about, as it is now, and whether it still applies.
+    rule: rule ? { text: rule.text, current: rule.current } : null,
+    shared: proposal.change.shared ?? rule?.shared ?? false,
+    onlyHere: proposal.change.onlyHere ?? rule?.onlyHere ?? false,
+    state: proposal.state,
+    expiresAt: proposal.expiresAt,
+    alreadyApplies: proposal.alreadyApplies.map((applying) => ({
+      kind: applying.kind,
+      text: applying.body,
+      from: applying.personal ? 'your personal space' : (applying.spaceName ?? 'a space above'),
+    })),
+  };
 }
 
 async function insertProposal(s: Session, proposal: Pick<Proposal, 'spaceId' | 'action' | 'itemId' | 'change'>): Promise<Proposal> {

@@ -1,7 +1,8 @@
 // Issue #4, done when: an assistant proposes a rule, and it applies only once
-// the person approves it in Homing. The assistant can't approve it, nor can
-// anyone else. Rejecting, expiring, a rule that changed before the decision,
-// and rights lost before it each leave the rules as they were.
+// the person approves it, in Homing or on the card in Claude. The assistant
+// can't approve it, nor can anyone else. Rejecting, expiring, a rule that
+// changed before the decision, and rights lost before it each leave the
+// rules as they were.
 
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
@@ -9,14 +10,21 @@ import { authDatabaseUrl } from '../src/db.ts';
 import { addRule, editRule, rulesFor } from '../src/guidance.ts';
 import { startServer, type Homing } from '../src/server.ts';
 import { addMember, createSpace } from '../src/spaces.ts';
-import { Assistant, testAssistants } from './assistant.ts';
+import { Assistant, assistants, testAssistants } from './assistant.ts';
 import { admin, as, db, member, refused, until, type Member } from './helpers.ts';
 import { inTestDatabase } from './reset.ts';
 
 let homing: Homing;
 
 before(async () => {
-  homing = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase: inTestDatabase(authDatabaseUrl), ...testAssistants });
+  homing = await startServer(db, {
+    port: 0,
+    host: '127.0.0.1',
+    authDatabase: inTestDatabase(authDatabaseUrl),
+    ...testAssistants,
+    // Claude is checked to keep the model from pressing the card's buttons, and ChatGPT not yet.
+    cardClients: [assistants.claude.client_id],
+  });
 });
 
 after(() => homing.close());
@@ -33,9 +41,9 @@ async function acme() {
   return { ana, cara, space, ref: `space:${space}`, claude: { ana: await chat(ana), cara: await chat(cara) } };
 }
 
-/** A conversation with Claude, connected for the person. */
-async function chat(who: Member) {
-  const claude = new Assistant(homing.url);
+/** A conversation with Claude, or another assistant, connected for the person. */
+async function chat(who: Member, document = assistants.claude) {
+  const claude = new Assistant(homing.url, document);
   await claude.connect(who.browser);
   return { ...(await claude.open()), token: claude.tokens!.access_token };
 }
@@ -94,8 +102,10 @@ test('an assistant can’t approve its own proposal', async () => {
   const { ana, ref, space, claude } = await acme();
   const { id } = await propose(claude.ana, { space: ref, change: 'add', kind: 'requirement', text: 'Never send prices by email', shared: true });
 
-  // There is no tool for it.
-  assert.deepEqual(await claude.ana.tools(), ['act', 'context', 'read', 'remember', 'search']);
+  // The model has no tool for it. Claude shows the card's tools only to the card.
+  const visibility = (tool: { _meta?: Record<string, any> }): string[] => tool._meta?.ui?.visibility ?? ['model', 'app'];
+  const forTheModel = (await claude.ana.client.listTools()).tools.filter((tool) => visibility(tool).includes('model'));
+  assert.deepEqual(forTheModel.map((tool) => tool.name).sort(), ['act', 'context', 'read', 'remember', 'search']);
 
   // Its token doesn't count as Ana on Homing's pages.
   const withToken = await fetch(new URL(`/api/proposals/${id}/decide`, homing.url), {
@@ -110,6 +120,7 @@ test('an assistant can’t approve its own proposal', async () => {
   const throughClaude = { person: ana.id, agent: 'Claude' };
   for (const principal of [throughClaude, { ...throughClaude, direct: true as const }]) {
     await assert.rejects(as(principal, (s) => s.tx`update proposals set state = 'approved' where id = ${id}`), refused);
+    await assert.rejects(as(principal, (s) => s.tx`update proposals set decided_in = 'Claude' where id = ${id}`), refused);
   }
   await assert.rejects(
     as(throughClaude, (s) => s.tx`
@@ -247,4 +258,84 @@ test('only a space’s admins propose changes to its shared rules, for now', asy
   const outside = await (await chat(ben)).call('act', { action: 'guidance.propose', input: { space: ref, change: 'add', kind: 'preference', text: 'Hello' } });
   assert.match(outside.text, /There is no space with that reference that you can see/);
   assert.deepEqual(await rules(ana, space), ['Never send prices by email']);
+});
+
+/** What the card gets back from a tool it calls through the assistant. */
+async function throughTheCard(claude: Chat, name: string, args: Record<string, unknown>) {
+  const result = await claude.client.callTool({ name, arguments: args });
+  return { failed: Boolean(result.isError), proposal: (result.structuredContent as { proposal?: Record<string, any> } | undefined)?.proposal };
+}
+
+test('in Claude, the person approves on the card in the conversation', async () => {
+  const { ana, ref, space, claude } = await acme();
+  const asked = await claude.ana.client.callTool({
+    name: 'act',
+    arguments: { action: 'guidance.propose', input: { space: ref, change: 'add', kind: 'preference', text: 'Write status reports in Norwegian', shared: true } },
+  });
+  const id = (asked.structuredContent as { proposal: string }).proposal;
+  // Claude shows the card with it, and still has the link in case the card doesn't show.
+  const text = asked.content.map((block) => (block.type === 'text' ? block.text : '')).join('');
+  assert.match(text, /in a card here/);
+  assert.ok(text.includes(`/proposals/${id}`));
+
+  const { tools } = await claude.ana.client.listTools();
+  const meta = Object.fromEntries(tools.map((tool) => [tool.name, tool._meta?.ui]));
+  assert.deepEqual(meta.act, { resourceUri: 'ui://homing/approval.html' });
+  // Only the card can call these: Claude keeps them from the model.
+  assert.deepEqual(meta.approval, { resourceUri: 'ui://homing/approval.html', visibility: ['app'] });
+  assert.deepEqual(meta.decide, { resourceUri: 'ui://homing/approval.html', visibility: ['app'] });
+  const { contents } = await claude.ana.client.readResource({ uri: 'ui://homing/approval.html' });
+  assert.equal(contents[0].mimeType, 'text/html;profile=mcp-app');
+  assert.match(String((contents[0] as { text?: string }).text), /^<!doctype html>/i);
+
+  // The card shows the change as it is now, and Ana approves it there.
+  const shown = await throughTheCard(claude.ana, 'approval', { proposal: id });
+  assert.deepEqual([shown.proposal?.text, shown.proposal?.state], ['Write status reports in Norwegian', 'open']);
+  const approved = await throughTheCard(claude.ana, 'decide', { proposal: id, approve: true });
+  assert.equal(approved.proposal?.state, 'approved');
+  assert.deepEqual(await rules(ana, space), ['Write status reports in Norwegian']);
+
+  // It's recorded as Ana's own decision, made on Claude's card.
+  const [decision] = await admin`select decided_by, decided_in from proposals where id = ${id}`;
+  assert.deepEqual(decision, { decidedBy: ana.id, decidedIn: 'Claude' });
+  // Drawn again later, the card shows it decided, and it can't be decided twice.
+  assert.equal((await throughTheCard(claude.ana, 'approval', { proposal: id })).proposal?.state, 'approved');
+  const again = await throughTheCard(claude.ana, 'decide', { proposal: id, approve: false });
+  assert.deepEqual([again.failed, again.proposal?.state], [true, 'approved']);
+});
+
+test('the card checks the same things as the page', async () => {
+  const { ana, cara, ref, space, claude } = await acme();
+  const rule = await as(direct(ana), (s) => addRule(s, { spaceId: space, kind: 'preference', body: 'Write reports in English', shared: true }));
+  const { id } = await propose(claude.ana, { space: ref, change: 'change', rule: `item:${rule.id}`, text: 'Write reports in Norwegian' });
+  await as(direct(ana), (s) => editRule(s, rule.id, 'Write reports in English or Norwegian'));
+
+  // The rule changed after the card showed it, so the card shows it again.
+  const stale = await throughTheCard(claude.ana, 'decide', { proposal: id, approve: true, shown: 'Write reports in English' });
+  assert.deepEqual([stale.failed, stale.proposal?.rule.text], [true, 'Write reports in English or Norwegian']);
+  assert.deepEqual(await rules(ana, space), ['Write reports in English or Norwegian']);
+
+  // An expired one can't be approved, and nobody else's card can decide Ana's.
+  const late = await propose(claude.ana, { space: ref, change: 'add', kind: 'preference', text: 'Use the old template' });
+  await admin`update proposals set expires_at = now() - interval '1 minute' where id = ${late.id}`;
+  assert.equal((await throughTheCard(claude.ana, 'decide', { proposal: late.id, approve: true })).failed, true);
+  const other = await propose(claude.ana, { space: ref, change: 'add', kind: 'preference', text: 'Use the new template' });
+  const caras = await throughTheCard(claude.cara, 'decide', { proposal: other.id, approve: true });
+  assert.deepEqual([caras.failed, caras.proposal], [true, undefined]);
+  assert.deepEqual(await rules(ana, space), ['Write reports in English or Norwegian']);
+});
+
+test('only assistants checked to keep the model off the card get it', async () => {
+  const { ana, ref, space } = await acme();
+  const chatgpt = await chat(ana, assistants.chatgpt);
+  const { id, text } = await propose(chatgpt, { space: ref, change: 'add', kind: 'preference', text: 'Write reports in Norwegian' });
+  assert.doesNotMatch(text, /card/);
+
+  // No card, and no way to decide in the conversation: the person gets the link.
+  const { tools } = await chatgpt.client.listTools();
+  assert.deepEqual(tools.map((tool) => tool.name).sort(), ['act', 'context', 'read', 'remember', 'search']);
+  assert.equal(tools.find((tool) => tool.name === 'act')?._meta, undefined);
+  await assert.rejects(throughTheCard(chatgpt, 'decide', { proposal: id, approve: true }), /Tool decide not found/);
+  await assert.rejects(chatgpt.client.readResource({ uri: 'ui://homing/approval.html' }));
+  assert.deepEqual(await rules(ana, space), []);
 });

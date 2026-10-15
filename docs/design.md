@@ -105,7 +105,10 @@ On the sign-in page the bird flies in over the top right of the sign-in card, ca
 
 ## The approval card
 
-Inside Claude and ChatGPT the approval card takes the host's colors, font and corners, and keeps sage for the main action. In a dark host the sage turns lighter and more saturated, so the main action never looks disabled. It uses the same components as the confirmation page and is built as one self-contained HTML file.
+Inside an assistant the approval card takes the host's colors, font and corners, and keeps sage for the main action. In a dark host the sage turns lighter and more saturated, so the main action never looks disabled. It shows the same parts as the decision page, sized for a chat, and is built as one self-contained HTML file.
+
+- The assistant can draw the card again later, so it always shows how things stand now, and a decided change stays greyed with its outcome.
+- Only assistants checked to keep the model from pressing its buttons show it, Claude first. The others give the person a link to the decision page.
 
 ## Working on screens
 
