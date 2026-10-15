@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import postgres from 'postgres';
 import * as z from 'zod';
 import { AccessDenied, personOf, withPrincipal, type Session, type Sql } from './db.ts';
-import { rulesFor, type Rule } from './guidance.ts';
+import { rulesFor, type Rule, type RuleKind } from './guidance.ts';
 import {
   addSource,
   createPage,
@@ -16,6 +16,7 @@ import {
   writeItem,
   type Hit,
 } from './knowledge.ts';
+import { openProposals, proposeRule, readProposal, type Proposal } from './proposals.ts';
 import { skillsFor } from './skills.ts';
 import { listSpaces, peopleNames, type Space } from './spaces.ts';
 import type { AgentPrincipal } from './assistants.ts';
@@ -30,10 +31,11 @@ const instructions = `Homing holds the user's working context: their spaces, suc
 
 const text = () => z.string().trim().min(1);
 
-/** The MCP tools, for one person and their agent. */
-export function mcpServer(sql: Sql, principal: AgentPrincipal): McpServer {
+/** The MCP tools, for one person and their agent, at the Homing reached at url. */
+export function mcpServer(sql: Sql, principal: AgentPrincipal, url: URL): McpServer {
   const server = new McpServer({ name: 'homing', version: process.env.HOMING_VERSION ?? 'dev' }, { instructions });
   const answer = (fn: (s: Session) => Promise<string>) => respond(sql, principal, fn);
+  const links: Links = { proposal: (id) => new URL(`/proposals/${id}`, url).toString() };
 
   server.registerTool(
     'context',
@@ -48,7 +50,8 @@ export function mcpServer(sql: Sql, principal: AgentPrincipal): McpServer {
       }),
       annotations: { readOnlyHint: true },
     },
-    ({ request, space }) => answer((s) => (space ? spaceContext(s, parseRef(space, 'space'), request) : resolve(s, request))),
+    ({ request, space }) =>
+      answer((s) => (space ? spaceContext(s, links, parseRef(space, 'space'), request) : resolve(s, links, request))),
   );
 
   server.registerTool(
@@ -73,11 +76,11 @@ export function mcpServer(sql: Sql, principal: AgentPrincipal): McpServer {
     'read',
     {
       title: 'Read',
-      description: 'Reads a space, a page, an item with its history, or a source, by its reference.',
+      description: 'Reads a space, a page, an item with its history, a source, or a proposal and whether it was approved, by its reference.',
       inputSchema: z.object({ ref: text().describe('A reference, such as page:…') }),
       annotations: { readOnlyHint: true },
     },
-    ({ ref }) => answer((s) => read(s, ref)),
+    ({ ref }) => answer((s) => read(s, links, ref)),
   );
 
   server.registerTool(
@@ -112,10 +115,46 @@ export function mcpServer(sql: Sql, principal: AgentPrincipal): McpServer {
     (input) => answer((s) => remember(s, input)),
   );
 
+  server.registerTool(
+    'act',
+    {
+      title: 'Act',
+      description:
+        'Makes a change that the user decides. guidance.propose proposes adding, changing or removing a rule: ' +
+        'nothing changes until the user approves the exact change in Homing, and nobody can approve it for them. ' +
+        'Give the user the link it returns.',
+      inputSchema: z.object({
+        action: z.enum(['guidance.propose']),
+        input: z.object({
+          space: text().describe('The space the rule is in, such as space:…'),
+          change: z.enum(['add', 'change', 'remove']),
+          rule: text().optional().describe('The rule to change or remove, such as item:…'),
+          kind: z
+            .enum(['requirement', 'preference'])
+            .optional()
+            .describe('For a new rule. A requirement must always be followed; a preference gives way to a more specific one'),
+          text: text().optional().describe("The new rule, or the rule's new wording, exactly as the user wants it"),
+          shared: z
+            .boolean()
+            .optional()
+            .describe("For a new rule: true for everyone in the space, which only the space's admins can propose. Otherwise only for the user"),
+          onlyHere: z.boolean().optional().describe('For a new rule: true to keep it out of the spaces below this one'),
+        }),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ input }) => answer((s) => proposeGuidance(s, links, input)),
+  );
+
   return server;
 }
 
-const onlyPeople = 'Only people change guidance. Show the user the exact rule, and ask them to add it themselves.';
+/** Addresses of Homing's own pages, which people open from the conversation. */
+interface Links {
+  proposal(id: string): string;
+}
+
+const onlyPeople = 'Only people change guidance. To add, change or remove a rule, propose it with `act`, and the user approves it in Homing.';
 
 async function respond(sql: Sql, principal: AgentPrincipal, fn: (s: Session) => Promise<string>) {
   try {
@@ -147,7 +186,7 @@ function refusal(error: unknown): string | undefined {
 /** A request Homing can't carry out as asked. */
 class Refused extends Error {}
 
-type Kind = 'space' | 'page' | 'item' | 'source';
+type Kind = 'space' | 'page' | 'item' | 'source' | 'proposal';
 
 const ref = (kind: Kind, id: string) => `${kind}:${id}`;
 
@@ -158,13 +197,13 @@ function parseRef(value: string, kind: Kind): string {
 }
 
 function parseAnyRef(value: string): { kind: Kind; id: string } {
-  const match = /^(space|page|item|source):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(value.trim());
+  const match = /^(space|page|item|source|proposal):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(value.trim());
   if (!match) throw new Refused(`"${value}" isn't a reference. References look like page:… or item:….`);
   return { kind: match[1] as Kind, id: match[2].toLowerCase() };
 }
 
 /** Without a space: the space the request is about, if that's clear, or the candidates. */
-async function resolve(s: Session, request: string): Promise<string> {
+async function resolve(s: Session, links: Links, request: string): Promise<string> {
   const spaces = await listSpaces(s);
   const named = spaces.filter((space) => mentions(request, space.name));
   const matched = new Set((await search(s, request, { limit: 50, current: true, knowledge: true })).map((hit) => hit.spaceId));
@@ -172,7 +211,7 @@ async function resolve(s: Session, request: string): Promise<string> {
 
   if (candidates.length === 1) {
     const why = named.length ? 'the request names it' : 'it is the only space with matching knowledge';
-    return `Picked ${candidates[0].name}, because ${why}.\n\n${await spaceContext(s, candidates[0].id, request)}`;
+    return `Picked ${candidates[0].name}, because ${why}.\n\n${await spaceContext(s, links, candidates[0].id, request)}`;
   }
   const names = await peopleNames(s, [personOf(s.principal) ?? null]);
   return [
@@ -186,7 +225,7 @@ async function resolve(s: Session, request: string): Promise<string> {
 }
 
 /** With a space: its pages, and what is relevant to the request. */
-async function spaceContext(s: Session, spaceId: string, request?: string): Promise<string> {
+async function spaceContext(s: Session, links: Links, spaceId: string, request?: string): Promise<string> {
   const space = (await listSpaces(s)).find((candidate) => candidate.id === spaceId);
   if (!space) throw new Refused('There is no space with that reference that you can see.');
 
@@ -194,6 +233,7 @@ async function spaceContext(s: Session, spaceId: string, request?: string): Prom
   const pages = await listPages(s, spaceId);
   const rules = await rulesFor(s, spaceId);
   const skills = await skillsFor(s, spaceId);
+  const waiting = await openProposals(s, spaceId);
   const lines = [
     `# ${space.name}`,
     `You are ${(await peopleNames(s, [me])).get(me)}${space.admin ? ', an admin of this space' : ''} (${ref('space', space.id)}). ` +
@@ -205,6 +245,13 @@ async function spaceContext(s: Session, spaceId: string, request?: string): Prom
             'and between equally specific preferences the private one wins. No preference wins over a requirement. ' +
             'If two requirements conflict, stop before doing what they conflict on, and tell the user which rules conflict.',
           ...rules.map((rule) => `- ${describeRule(rule)} (${ref('item', rule.id)})`),
+        ]
+      : []),
+    ...(waiting.length
+      ? [
+          '\n## Waiting for approval',
+          'Changes the user hasn\'t decided yet. Nothing changes until they approve them.',
+          ...waiting.map((proposal) => `- ${describeProposal(proposal)} (${ref('proposal', proposal.id)}, approve at ${links.proposal(proposal.id)})`),
         ]
       : []),
     ...(skills.length
@@ -226,11 +273,17 @@ async function spaceContext(s: Session, spaceId: string, request?: string): Prom
   return lines.join('\n');
 }
 
-async function read(s: Session, value: string): Promise<string> {
+async function read(s: Session, links: Links, value: string): Promise<string> {
   const { kind, id } = parseAnyRef(value);
   const missing = new Refused(`There is no ${kind} with that reference that you can see.`);
 
-  if (kind === 'space') return spaceContext(s, id);
+  if (kind === 'space') return spaceContext(s, links, id);
+
+  if (kind === 'proposal') {
+    const proposal = await readProposal(s, id);
+    if (!proposal) throw missing;
+    return `${describeProposal(proposal)}\n\n${ref('proposal', proposal.id)} in ${proposal.space.name}. ${outcome(proposal, links)}`;
+  }
 
   if (kind === 'page') {
     const page = await readPage(s, id);
@@ -250,7 +303,7 @@ async function read(s: Session, value: string): Promise<string> {
     if (page.type === 'guidance') {
       return [
         `# Guidance for ${space?.name ?? 'a space above'}`,
-        `The rules you can see here (${ref('page', page.id)}). Only people change them.`,
+        `The rules you can see here (${ref('page', page.id)}). Only people change them: propose a change with \`act\`.`,
         '',
         ...page.items.map(
           (item) =>
@@ -372,6 +425,66 @@ async function pageFor(s: Session, spaceId: string, page?: string, type?: string
   const existing = (await listPages(s, spaceId)).find((candidate) => candidate.title?.toLowerCase() === title.toLowerCase());
   if (existing) return { id: existing.id, title: existing.title!, created: false };
   return { id: await createPage(s, { spaceId, title, type: page ? type : 'notes' }), title, created: true };
+}
+
+async function proposeGuidance(
+  s: Session,
+  links: Links,
+  input: {
+    space: string;
+    change: 'add' | 'change' | 'remove';
+    rule?: string;
+    kind?: RuleKind;
+    text?: string;
+    shared?: boolean;
+    onlyHere?: boolean;
+  },
+): Promise<string> {
+  const spaceId = parseRef(input.space, 'space');
+  let proposal: Proposal;
+  if (input.change === 'add') {
+    if (!input.kind || !input.text) throw new Refused('A new rule needs its kind and its text.');
+    proposal = await proposeRule(s, { action: 'add rule', spaceId, kind: input.kind, text: input.text, shared: input.shared, onlyHere: input.onlyHere });
+  } else {
+    if (!input.rule) throw new Refused(`Name the rule to ${input.change}, such as item:….`);
+    const ruleId = parseRef(input.rule, 'item');
+    if (input.change === 'change') {
+      if (!input.text) throw new Refused("Give the rule's new text.");
+      proposal = await proposeRule(s, { action: 'change rule', spaceId, ruleId, text: input.text });
+    } else {
+      proposal = await proposeRule(s, { action: 'remove rule', spaceId, ruleId });
+    }
+  }
+  return (
+    `Waiting for the user's approval (${ref('proposal', proposal.id)}). Nothing has changed yet. ` +
+    `Give them this link to approve or reject it in Homing: ${links.proposal(proposal.id)}\n\n` +
+    'Only they can decide it, so never say it is approved until `read` shows it is. Once it is, call `context` again for the rules as they are.'
+  );
+}
+
+/** "Add a preference: "Write reports in Norwegian"", for an agent. */
+function describeProposal(proposal: Proposal): string {
+  const { change } = proposal;
+  if (proposal.action === 'add rule') {
+    const where = [change.shared ? 'shared' : 'private', change.onlyHere && 'only here'].filter(Boolean).join(', ');
+    return `Add a ${change.kind} (${where}): ${quote(change.text!)}`;
+  }
+  const rule = ref('item', proposal.itemId!);
+  return proposal.action === 'change rule' ? `Change ${rule} to: ${quote(change.text!)}` : `Remove ${rule}`;
+}
+
+/** Where a proposal stands, for an agent. */
+function outcome(proposal: Proposal, links: Links): string {
+  switch (proposal.state) {
+    case 'open':
+      return `Waiting for the user's approval until ${day(proposal.expiresAt)}, at ${links.proposal(proposal.id)}. Nothing has changed yet.`;
+    case 'approved':
+      return `The user approved it on ${day(proposal.decidedAt!)}, and it applies now. Call \`context\` for the rules as they are.`;
+    case 'rejected':
+      return `The user rejected it on ${day(proposal.decidedAt!)}. Nothing changed.`;
+    case 'expired':
+      return `Nobody decided it before ${day(proposal.expiresAt)}, so it expired and nothing changed.`;
+  }
 }
 
 async function describeHits(s: Session, hits: Hit[]): Promise<string[]> {

@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Wordmark } from '@/components/wordmark';
-import { longProposal, proposal, sampleAccount } from '@/sample';
+import type { ProposalData } from '@/lib/proposals';
+import { changeProposal, longProposal, personalProposal, proposal, removeProposal, sampleAccount } from '@/sample';
 import { Account } from '@/screens/account';
 import { CardPreview } from '@/screens/card-preview';
 import { Confirm } from '@/screens/confirm';
@@ -32,13 +33,37 @@ const screens: Record<string, { label: string; render: () => ReactNode }> = {
   '/recover/sent': { label: 'Can’t sign in: link sent', render: () => <Recover recovery="email" initial="sent" /> },
   '/recover/operator': { label: 'Can’t sign in, without email', render: () => <Recover recovery="operator" /> },
   '/connect': { label: 'Claude wants to use Homing as you', render: () => <Connect assistant={{ name: 'Claude', site: 'claude.ai' }} person="Ana Berg" /> },
-  '/confirm': { label: 'Confirm a rule', render: () => <Confirm proposal={proposal} /> },
-  '/confirm/long': { label: 'Confirm a longer rule', render: () => <Confirm proposal={longProposal} /> },
-  '/confirm/added': { label: 'Rule added', render: () => <Confirm proposal={proposal} initial="added" /> },
-  '/confirm/declined': { label: 'Rule not added', render: () => <Confirm proposal={proposal} initial="declined" /> },
+  '/confirm': { label: 'Confirm a rule', render: () => <SampleConfirm proposal={proposal} /> },
+  '/confirm/long': { label: 'Confirm a longer rule', render: () => <SampleConfirm proposal={longProposal} /> },
+  '/confirm/private': { label: 'Confirm a rule only for you', render: () => <SampleConfirm proposal={{ ...proposal, shared: false }} /> },
+  '/confirm/personal': { label: 'Confirm a rule in your personal space', render: () => <SampleConfirm proposal={personalProposal} /> },
+  '/confirm/change': { label: 'Confirm changing a rule', render: () => <SampleConfirm proposal={changeProposal} /> },
+  '/confirm/remove': { label: 'Confirm removing a rule', render: () => <SampleConfirm proposal={removeProposal} /> },
+  '/confirm/changed': { label: 'Confirm: the rule changed meanwhile', render: () => <SampleConfirm proposal={changeProposal} message="This rule changed after you opened this page. Check the change again." /> },
+  '/confirm/added': { label: 'Rule added', render: () => <SampleConfirm proposal={{ ...proposal, state: 'approved' }} /> },
+  '/confirm/declined': { label: 'Rule not added', render: () => <SampleConfirm proposal={{ ...proposal, state: 'rejected' }} /> },
+  '/confirm/removed': { label: 'Rule removed', render: () => <SampleConfirm proposal={{ ...removeProposal, state: 'approved', rule: { ...removeProposal.rule!, current: false } }} /> },
+  '/confirm/expired': { label: 'Request expired', render: () => <SampleConfirm proposal={{ ...proposal, state: 'expired' }} /> },
+  '/confirm/gone': { label: 'Rule removed before deciding', render: () => <SampleConfirm proposal={{ ...changeProposal, rule: { ...changeProposal.rule!, current: false } }} /> },
   '/card-preview': { label: 'Approval card in Claude and ChatGPT', render: () => <CardPreview /> },
   '/card-preview/long': { label: 'Approval card with a longer rule', render: () => <CardPreview sample="long" /> },
 };
+
+/** The decision page, deciding on the sample instead of the server. */
+function SampleConfirm({ proposal, message }: { proposal: ProposalData; message?: string }) {
+  const [shown, setShown] = useState(proposal);
+  return (
+    <Confirm
+      proposal={shown}
+      person="Ana Berg"
+      message={message}
+      decide={async (approve, onlyHere) => {
+        setShown({ ...shown, onlyHere, state: approve ? 'approved' : 'rejected', rule: shown.rule && { ...shown.rule, current: shown.action !== 'remove' } });
+        return undefined;
+      }}
+    />
+  );
+}
 
 export function Samples() {
   const screen = screens[location.pathname.replace(/\/$/, '')];

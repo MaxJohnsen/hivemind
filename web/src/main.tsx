@@ -11,11 +11,15 @@ const pages: Record<string, ComponentType> = {
   '/account': lazy(() => import('@/pages/account').then((page) => ({ default: page.AccountPage }))),
   '/connect': lazy(() => import('@/pages/connect').then((page) => ({ default: page.ConnectPage }))),
   '/recover': lazy(() => import('@/pages/recover').then((page) => ({ default: page.RecoverPage }))),
+  '/proposals/:id': lazy(() => import('@/pages/proposal').then((page) => ({ default: page.ProposalPage }))),
 };
+
+// A page's address, without what identifies the thing on it, such as /proposals/<id>.
+const path = location.pathname.replace(/\/$/, '').replace(/^(\/proposals)\/[0-9a-f-]{36}$/i, '$1/:id');
 
 const Page = import.meta.env.DEV
   ? lazy(() => import('@/samples').then((samples) => ({ default: samples.Samples })))
-  : (pages[location.pathname.replace(/\/$/, '')] ?? NotFound);
+  : (pages[path] ?? NotFound);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

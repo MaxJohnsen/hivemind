@@ -11,7 +11,7 @@ import { setupLink } from '../src/invites.ts';
 import { startServer, type Homing } from '../src/server.ts';
 import { createSpace, listSpaces } from '../src/spaces.ts';
 import { Browser } from './browser.ts';
-import { admin, as, authDb, db, invite, person } from './helpers.ts';
+import { admin, as, authDb, db, invite, person, until } from './helpers.ts';
 import { freshDatabase, inTestDatabase } from './reset.ts';
 
 describe('a new Homing', () => {
@@ -360,10 +360,3 @@ function fragment(link: string | undefined): string {
 }
 
 const tag = () => randomBytes(4).toString('hex');
-
-async function until(condition: () => Promise<boolean>) {
-  for (let tries = 0; !(await condition()); tries++) {
-    if (tries > 100) throw new Error('timed out');
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-}

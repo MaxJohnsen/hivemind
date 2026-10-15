@@ -61,6 +61,7 @@ Each routine run is a job, recording who it acted for, which connection it used,
 - It uses the same access table and content visibility as the application, including the exceptions for guidance and proposals.
 - A skill's files are items on its page, each with its path, so a SKILL.md folder is stored as it was imported. For now Homing keeps only text files up to 512 KB, small enough to search, and doesn't follow links.
 - Each guidance item records whether it reaches down, and a read-only policy lets shared guidance through to the spaces below, closed ones included. Private guidance needs no exception, since its owner can open its space. A trigger checks every write to a guidance or skill page: it must be a person editing directly, shared guidance needs an admin, and each page holds only its own kind of item. Only the web app and the command line mark an edit as direct, so a new path can't change guidance by accident.
+- A proposal is on the private side of the person it's for. Assistants make them, and only that person decides one: editing directly, once, and within a week, which a trigger checks. Approving makes the change as that person, so it passes the same checks as a direct edit, at that moment.
 - One restricted database role handles normal operations. Each request or routine sets its person or space for the transaction, and background workers get no elevated access.
 - A separate admin role is used only for migrations and narrowly defined housekeeping, such as deletion cascades and access-table updates. The normal role can't write the access table, and changes spaces and memberships only through database functions that check the caller's rights.
 - It covers sensitive data: content, sources, credentials and search data. Purely technical tables don't need the same policies.
@@ -77,7 +78,7 @@ Every assistant, Claude Code included, connects over OAuth to `/mcp`. It names i
 
 People join through invites from the instance admin. Email is optional, over SMTP. With it, an invite can be sent by email, which verifies the address it is accepted with, and someone who can't sign in gets a one-time sign-in link at their verified address. Without it, whoever runs the server makes that link with the command line. Either way the link only signs the person in, once, so they can add a new passkey.
 
-Until the web app and assistants can, the command-line tool also sets up spaces and edits guidance. It is a stand-in, not the intended way to use Homing.
+Until the web app and assistants can, the command-line tool also sets up spaces and imports skills. It is a stand-in, not the intended way to use Homing.
 
 The command line and the database credentials are operator access. The command line takes any person's id without sign-in, and any connection with the credentials can mark itself as a person editing directly, so either can act as anyone, including changing guidance. An agent that can run commands where Homing runs, such as Claude Code on the same machine, has that access too. Once there is sign-in, a direct edit needs a signed-in person, and the command line keeps only what setting up an instance needs.
 

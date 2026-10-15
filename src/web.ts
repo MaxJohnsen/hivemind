@@ -4,11 +4,13 @@ import { extname } from 'node:path';
 import { isAPIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
 import type { Pool } from 'pg';
+import postgres from 'postgres';
 import { connectedAssistants, disconnectAssistant } from './assistants.ts';
 import { joinWithPassword, mcpResource, saveTicket, signedInRecently, type Auth } from './auth.ts';
-import { withPrincipal, type Sql } from './db.ts';
+import { AccessDenied, withPrincipal, type Sql } from './db.ts';
 import { emails, type Mailer } from './email.ts';
 import { createInvite, findInvite, newTicket } from './invites.ts';
+import { decide, readProposal, Undecidable, type ProposalView } from './proposals.ts';
 
 /** What the web app's requests need from the server. */
 export interface App {
@@ -150,7 +152,68 @@ export async function handleApi(app: App, req: IncomingMessage, res: ServerRespo
     return json(res, 200, {});
   }
 
+  const proposal = /^\/api\/proposals\/([0-9a-f-]{36})(\/decide)?$/i.exec(path);
+  if (proposal && (req.method === 'GET' ? !proposal[2] : req.method === 'POST' && proposal[2])) {
+    const session = await app.auth.api.getSession({ headers });
+    if (!session) return json(res, 401, { message: 'Sign in first.' });
+    const person = session.user.id;
+    const id = proposal[1].toLowerCase();
+    const missing = { message: 'There’s nothing for you to decide here.' };
+
+    if (req.method === 'GET') {
+      const found = await withPrincipal(app.sql, { person }, (s) => readProposal(s, id));
+      return found ? json(res, 200, { person: session.user.name, proposal: forPage(found) }) : json(res, 404, missing);
+    }
+
+    const body = await readJson(req);
+    if (typeof body.approve !== 'boolean') return json(res, 400, { message: 'Approve or reject it.' });
+    try {
+      // Deciding is a person acting directly, never their assistant.
+      const decided = await withPrincipal(app.sql, { person, direct: true }, (s) =>
+        decide(s, id, {
+          approve: body.approve as boolean,
+          shown: typeof body.shown === 'string' ? body.shown : undefined,
+          onlyHere: typeof body.onlyHere === 'boolean' ? body.onlyHere : undefined,
+        }),
+      );
+      return decided ? json(res, 200, { person: session.user.name, proposal: forPage(decided) }) : json(res, 404, missing);
+    } catch (error) {
+      if (error instanceof Undecidable) return json(res, error.reason === 'expired' ? 410 : 409, { code: error.reason.toUpperCase(), message: error.message });
+      if (error instanceof AccessDenied || (error instanceof postgres.PostgresError && error.code === '42501')) {
+        return json(res, 403, { message: 'You can’t make this change any more, so nothing changed.' });
+      }
+      throw error;
+    }
+  }
+
   return json(res, 404, { message: 'Not found.' });
+}
+
+/** What the decision page shows: the exact change, where, and what already applies there. */
+function forPage(proposal: ProposalView) {
+  const action = ({ 'add rule': 'add', 'change rule': 'change', 'remove rule': 'remove' } as const)[proposal.action];
+  const rule = proposal.rule;
+  return {
+    id: proposal.id,
+    assistant: proposal.agent ?? 'Your assistant',
+    space: proposal.space.name,
+    personal: proposal.space.personal,
+    action,
+    kind: proposal.change.kind ?? rule?.kind ?? 'preference',
+    // The new rule, or the rule's new wording.
+    text: proposal.change.text ?? null,
+    // The rule a change or removal is about, as it is now, and whether it still applies.
+    rule: rule ? { text: rule.text, current: rule.current } : null,
+    shared: proposal.change.shared ?? rule?.shared ?? false,
+    onlyHere: proposal.change.onlyHere ?? rule?.onlyHere ?? false,
+    state: proposal.state,
+    expiresAt: proposal.expiresAt,
+    alreadyApplies: proposal.alreadyApplies.map((applying) => ({
+      kind: applying.kind,
+      text: applying.body,
+      from: applying.personal ? 'your personal space' : (applying.spaceName ?? 'a space above'),
+    })),
+  };
 }
 
 const dist = new URL('../web/dist/app/', import.meta.url);
@@ -201,7 +264,7 @@ export async function serveApp(app: App, req: IncomingMessage, res: ServerRespon
       'x-content-type-options': 'nosniff',
     });
   } else {
-    res.writeHead(pages.has(path) ? 200 : 404, {
+    res.writeHead(pages.has(path) || /^\/proposals\/[0-9a-f-]{36}$/i.test(path) ? 200 : 404, {
       'content-type': 'text/html; charset=utf-8',
       'cache-control': 'no-cache',
       'content-security-policy':

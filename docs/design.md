@@ -80,6 +80,7 @@ Figtree is the only typeface, and it ships with the app. Page titles are 24 px, 
 - Inviting people is on the account page for now. It belongs in an administration area once there is one.
 - Sign-in with Google or Microsoft uses the providers' own marks, as their guidelines ask.
 - Decision pages are one centered column with a single heading that says who wants what, where.
+- When an assistant proposes a rule change, its link opens the decision page, after signing in if needed. A new rule shows where it applies and the rules already there; a change shows the rule now above its new wording; a removal says where it stops applying. If the rule changes while the page is open, approving shows it again instead.
 
 ## Illustrations
 

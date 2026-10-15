@@ -1,11 +1,11 @@
-// Sets up spaces, rules and skills, until Homing's web app and assistants
-// can, and gives people a sign-in link when they can't sign in. Everything
-// here is a person editing directly.
+// Sets up spaces and skills, until Homing's web app and assistants can, and
+// gives people a sign-in link when they can't sign in. Everything here is a
+// person editing directly. Rules change through assistants, with approval.
 
 import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import { authDatabaseUrl, connect, withPrincipal } from './db.ts';
-import { addRule, editRule, removeRule, rulesFor, type Rule, type RuleKind } from './guidance.ts';
+import { rulesFor, type Rule } from './guidance.ts';
 import { readSkillFolder, removeSkill, saveSkill, skillsFor } from './skills.ts';
 import { createAuth } from './auth.ts';
 import { operatorSignInLink } from './recovery.ts';
@@ -21,18 +21,15 @@ const usage = `Usage: node src/cli.ts <command>
   spaces <person>
 
   rules <person> <space>                  The rules that apply in a space, least specific first
-  add-rule <person> <space> requirement|preference <text> [--private] [--only-here]
-  edit-rule <person> <rule> <text>
-  remove-rule <person> <rule>
 
   skills <person> <space>                 The skills that apply in a space
   import-skill <person> <space> <folder> [--private]
                                           Adds a SKILL.md folder, or updates the skill with its name
   remove-skill <person> <skill>
 
-Rules and skills are shared with the space unless --private is given, or
-the space is in your personal tree. They also apply in the spaces below
-their own. A rule can be kept to its space with --only-here.`;
+Skills are shared with the space unless --private is given, or the space is
+in your personal tree. They also apply in the spaces below their own. To
+change rules, ask your assistant: you approve each change in Homing.`;
 
 const sql = connect();
 const [command, ...rest] = process.argv.slice(2);
@@ -72,28 +69,6 @@ try {
     for (const space of await as(args[0], listSpaces)) console.log(`${space.id}  ${space.name}`);
   } else if (command === 'rules' && args.length === 2) {
     printRules(await as(args[0], (s) => rulesFor(s, args[1])));
-  } else if (command === 'add-rule' && args.length === 4 && ['requirement', 'preference'].includes(args[2])) {
-    const [person, spaceId, kind, body] = args;
-    await as(person, async (s) => {
-      const space = await spaceById(s, spaceId);
-      const shared = !flags.has('--private') && !space.privateTo;
-      const onlyHere = flags.has('--only-here');
-      console.log(`Rules that already apply in ${space.name}, least specific first:`);
-      printRules(await rulesFor(s, spaceId));
-      const rule = await addRule(s, { spaceId, kind: kind as RuleKind, body, shared, onlyHere });
-      console.log(`\nAdded ${rule.id}, a ${shared ? 'shared' : 'private'} ${kind} in ${space.name}.`);
-      if (shared && !onlyHere) console.log(`${reach(space)} Use --only-here to keep a rule to this space.`);
-    });
-  } else if (command === 'edit-rule' && args.length === 3) {
-    await as(args[0], async (s) => {
-      const rule = await editRule(s, args[1], args[2]);
-      if (!rule) return console.log('There is no rule with that id that you can change.');
-      console.log('Changed. What it said before is kept in its history.');
-      if (!rule.privateTo && rule.reachesDown) console.log(reach(await spaceById(s, rule.spaceId)));
-    });
-  } else if (command === 'remove-rule' && args.length === 2) {
-    const removed = await as(args[0], (s) => removeRule(s, args[1]));
-    console.log(removed ? 'Removed. It stays in the history.' : 'There is no rule with that id that you can change.');
   } else if (command === 'skills' && args.length === 2) {
     const skills = await as(args[0], (s) => skillsFor(s, args[1]));
     if (skills.length === 0) console.log('  None');

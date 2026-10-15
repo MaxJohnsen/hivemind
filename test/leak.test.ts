@@ -3,7 +3,8 @@
 // Ana works for Acme and Ben for Beta. Each has a page of knowledge on their
 // client's shared side, a private note on it that cites an email and has an
 // earlier version, notes in their personal space, a shared and a private
-// rule for their client, and a skill. Each tries to read and
+// rule for their client, a skill, and a rule their assistant proposed and
+// they haven't decided yet. Each tries to read and
 // change the other's, in three ways: through Homing, through Homing with
 // row-level security off, and straight against the database with Homing's
 // filters bypassed. So each layer is shown to refuse on its own.
@@ -25,6 +26,7 @@ import {
   type Item,
   type Source,
 } from '../src/knowledge.ts';
+import { decide, openProposals, proposeRule, readProposal, type Proposal } from '../src/proposals.ts';
 import { saveSkill, skillsFor } from '../src/skills.ts';
 import { addMember, createSpace, listSpaces, peopleNames } from '../src/spaces.ts';
 import { admin, as, authDb, db, person, refused, type Person } from './helpers.ts';
@@ -38,6 +40,7 @@ interface Client {
   rules: Item[];
   skill: { pageId: string; name: string };
   source: Source;
+  proposal: Proposal;
 }
 
 let acme: Client;
@@ -53,6 +56,7 @@ before(async () => {
     rule: 'Never send Acme prices by email',
     privateRule: 'Ana writes Acme reports in Norwegian',
     skill: 'acme-status-report',
+    proposed: 'Write Acme reports in Norwegian',
   });
   beta = await client('Beta', 'Ben', {
     shared: 'Beta’s budget is approved',
@@ -63,6 +67,7 @@ before(async () => {
     rule: 'Copy Beta’s CFO on every invoice',
     privateRule: 'Ben keeps Beta updates short',
     skill: 'beta-budget-review',
+    proposed: 'Send Beta invoices in euros',
   });
 });
 
@@ -147,6 +152,8 @@ for (const [layer, sql] of [
           assert.equal(await readPage(s, target.skill.pageId), undefined);
           const found = await search(s, target.skill.name.replaceAll('-', ' '));
           assert.ok(found.every((hit) => hit.spaceId === intruder.space || hit.spaceId === intruder.person.personalSpaceId));
+          assert.equal(await readProposal(s, target.proposal.id), undefined);
+          assert.equal((await openProposals(s, target.space)).length, 0);
           for (const rule of target.rules) {
             assert.equal(await readItem(s, rule.id), undefined);
             const hits = await search(s, rule.body);
@@ -166,7 +173,16 @@ for (const [layer, sql] of [
         for (const { id } of target.rules) {
           assert.equal(await as(me, (s) => editRule(s, id, 'Changed'), sql), undefined);
           assert.equal(await as(me, (s) => removeRule(s, id), sql), false);
+          // Nor through a proposal of their own, from their assistant.
+          const assistant = { ...intruder.person, agent: 'Claude' };
+          await assert.rejects(as(assistant, (s) => proposeRule(s, { action: 'remove rule', spaceId: target.space, ruleId: id }), sql), AccessDenied);
         }
+        await assert.rejects(
+          as({ ...intruder.person, agent: 'Claude' }, (s) => proposeRule(s, { action: 'add rule', spaceId: target.space, kind: 'requirement', text: 'Hello' }), sql),
+          AccessDenied,
+        );
+        // And they can't decide the other client's proposal.
+        assert.equal(await as(me, (s) => decide(s, target.proposal.id, { approve: true }), sql), undefined);
         const skill = [{ path: 'SKILL.md', body: '---\nname: hello\ndescription: Hello\n---\n' }];
         await assert.rejects(as(me, (s) => saveSkill(s, { spaceId: target.space, files: skill, shared: true }), sql), AccessDenied);
       }
@@ -177,7 +193,7 @@ for (const [layer, sql] of [
 
 describe('straight against the database', () => {
   test('each person reads only their own client’s rows', async () => {
-    for (const { name, person, items, rules: ownRules, skill, source } of [acme, beta]) {
+    for (const { name, person, items, rules: ownRules, skill, source, proposal } of [acme, beta]) {
       await as(person, async (s) => {
         const texts = await s.tx`select body from content where kind = 'text' order by created_at`;
         const rules = await s.tx`select body from content where kind in ('requirement', 'preference') order by created_at`;
@@ -190,6 +206,7 @@ describe('straight against the database', () => {
         const people = await s.tx`select name from people`;
         const members = await s.tx`select distinct person_id from memberships`;
         const access = await s.tx`select distinct person_id from space_access`;
+        const proposals = await s.tx`select change ->> 'text' as text from proposals`;
 
         assert.deepEqual(texts.map((row) => row.body), bodies(items));
         assert.deepEqual(rules.map((row) => row.body), bodies(ownRules));
@@ -202,6 +219,7 @@ describe('straight against the database', () => {
         assert.deepEqual(people.map((row) => row.name), [person.name]);
         assert.deepEqual(members.map((row) => row.personId), [person.id]);
         assert.deepEqual(access.map((row) => row.personId), [person.id]);
+        assert.deepEqual(proposals.map((row) => row.text), [proposal.change.text]);
       });
     }
   });
@@ -229,6 +247,14 @@ describe('straight against the database', () => {
         insert into citations (content_id, source_id) values (${intruder.items[1].id}, ${target.source.id})
       `), refused);
 
+      // Nor a proposal there, for anyone.
+      for (const privateTo of [me.id, target.person.id]) {
+        await assert.rejects(as({ ...me, agent: 'Claude' }, (s) => s.tx`
+          insert into proposals (space_id, private_to, action, change)
+          values (${target.space}, ${privateTo}, 'add rule', ${s.tx.json({ kind: 'requirement', text: 'Hello', shared: true })})
+        `), refused);
+      }
+
       // Nor a rule on the other client's guidance page, editing directly.
       await assert.rejects(as(me, (s) => s.tx`select guidance_page(${target.space})`), refused);
       const [rule] = target.rules;
@@ -247,6 +273,12 @@ describe('straight against the database', () => {
       `);
       assert.equal(changed.length, 0);
       await assert.rejects(as(intruder.person, (s) => s.tx`delete from content where id in ${s.tx(ids)}`), refused);
+
+      const decided = await as({ ...intruder.person, direct: true }, (s) => s.tx`
+        update proposals set state = 'approved' where id = ${target.proposal.id} returning id
+      `);
+      assert.equal(decided.length, 0);
+      await assert.rejects(as(intruder.person, (s) => s.tx`delete from proposals where id = ${target.proposal.id}`), refused);
     }
     await assertUntouched();
   });
@@ -317,10 +349,11 @@ async function client(
     rule: string;
     privateRule: string;
     skill: string;
+    proposed: string;
   },
 ): Promise<Client> {
   const p = await person(personName);
-  return as({ ...p, direct: true }, async (s) => {
+  const client = await as({ ...p, direct: true }, async (s) => {
     const space = await createSpace(s, { name });
     const page = await createPage(s, { spaceId: space, title: `${name} plans`, shared: true });
     const source = await addSource(s, { spaceId: space, reference: 'An email', excerpt: notes.email });
@@ -346,6 +379,10 @@ async function client(
       source,
     };
   });
+  const proposal = await as({ person: p.id, agent: 'Claude' }, (s) =>
+    proposeRule(s, { action: 'add rule', spaceId: client.space, kind: 'preference', text: notes.proposed, shared: true }),
+  );
+  return { ...client, proposal };
 }
 
 /** Every item and rule still says what its owner wrote, and nothing was removed. */
@@ -360,6 +397,8 @@ async function assertUntouched() {
     `;
     assert.deepEqual(stored.map((row) => row.body), bodies([...items, ...rules]));
   }
+  const proposals = await admin`select state from proposals where id in ${admin([acme.proposal.id, beta.proposal.id])}`;
+  assert.deepEqual(proposals.map((row) => row.state), ['open', 'open']);
 }
 
 function bodies(items: readonly { body: string }[]) {

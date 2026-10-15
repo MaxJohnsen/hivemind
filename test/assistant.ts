@@ -97,7 +97,8 @@ export class Assistant {
       const text = result.content.map((block) => (block.type === 'text' ? block.text : '')).join('\n');
       return { text, failed: Boolean(result.isError) };
     };
-    return { call, close: () => client.close() };
+    const tools = async () => (await client.listTools()).tools.map((tool) => tool.name).sort();
+    return { call, tools, close: () => client.close() };
   }
 }
 
