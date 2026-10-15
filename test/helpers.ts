@@ -1,5 +1,5 @@
 import { after } from 'node:test';
-import { adminUrl, connect, databaseUrl, withPrincipal, type Principal, type Session } from '../src/db.ts';
+import { adminUrl, authDatabaseUrl, connect, databaseUrl, withPrincipal, type Principal, type Session } from '../src/db.ts';
 import { createPerson } from '../src/spaces.ts';
 import { inTestDatabase } from './reset.ts';
 
@@ -9,7 +9,10 @@ export const db = connect(inTestDatabase(databaseUrl));
 /** The admin role, which row-level security doesn't apply to. */
 export const admin = connect(inTestDatabase(adminUrl));
 
-after(() => Promise.all([db.end(), admin.end()]));
+/** Sign-in's own role, which Better Auth uses. */
+export const authDb = connect(inTestDatabase(authDatabaseUrl));
+
+after(() => Promise.all([db.end(), admin.end(), authDb.end()]));
 
 /** Runs fn as a person or a space, the way Homing does. */
 export function as<T>(principal: Principal, fn: (s: Session) => Promise<T>, sql = db): Promise<T> {

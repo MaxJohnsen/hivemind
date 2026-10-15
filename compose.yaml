@@ -22,15 +22,23 @@ services:
     command: ["node", "src/migrate.ts"]
     environment:
       DATABASE_URL: postgres://homing_app:homing_app@db:5432/homing
+      AUTH_DATABASE_URL: postgres://homing_auth:homing_auth@db:5432/homing
       DATABASE_ADMIN_URL: postgres://homing:homing@db:5432/homing
     depends_on:
       db:
         condition: service_healthy
 
+  # Prints a link for creating the first account when it starts.
   homing:
     build: .
     environment:
       DATABASE_URL: postgres://homing_app:homing_app@db:5432/homing
+      AUTH_DATABASE_URL: postgres://homing_auth:homing_auth@db:5432/homing
+      # Where people and assistants reach Homing. Anything but localhost needs a secret too.
+      HOMING_URL: ${HOMING_URL:-}
+      # Required: Homing won't start without it. See CONTRIBUTING.
+      HOMING_SECRET: ${HOMING_SECRET:-}
+      HOMING_TRUSTED_PROXIES: ${HOMING_TRUSTED_PROXIES:-}
     ports:
       - "127.0.0.1:${HOMING_PORT:-4100}:4100"
     depends_on:

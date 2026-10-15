@@ -1,50 +1,164 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
+import { BlockList, isIP, type AddressInfo } from 'node:net';
 import { hostHeaderValidation, toNodeHandler } from '@modelcontextprotocol/node';
 import { createMcpHandler, localhostAllowedHostnames, type AuthInfo } from '@modelcontextprotocol/server';
-import { connect, type Sql } from './db.ts';
+import { toNodeHandler as authHandler } from 'better-auth/node';
+import { Pool } from 'pg';
+import { authEndpoints, clientAddressHeader, createAuth, type Auth } from './auth.ts';
+import { authDatabaseUrl, connect, type Sql } from './db.ts';
+import { setupLink } from './invites.ts';
 import { mcpServer } from './mcp.ts';
 import { authenticate, type AgentPrincipal } from './tokens.ts';
+import { handleApi, serveApp, type App } from './web.ts';
 
-/** Where Homing is reached, which decides the host names it answers to. */
-export const publicUrl = new URL(process.env.HOMING_URL ?? 'http://localhost:4100');
+export interface ServerOptions {
+  port: number;
+  host?: string;
+  /** Where Homing is reached. By default HOMING_URL, or localhost at the port it listens on. */
+  url?: URL;
+  /** Signs sessions. By default HOMING_SECRET, which only a server reachable from this machine alone may leave out. */
+  secret?: string;
+  /** Sign-in's own database connection, as homing_auth. */
+  authDatabase?: string;
+  /** Proxies whose X-Forwarded-For Homing believes, as addresses or ranges. By default HOMING_TRUSTED_PROXIES. */
+  trustedProxies?: string;
+  /** Whether sign-in limits how often each client tries. By default on, except for a local install. */
+  rateLimit?: boolean;
+}
 
-/** Serves MCP at /mcp. Every request needs a valid token. */
-export function startServer(sql: Sql, options: { port: number; host?: string }): Promise<Server> {
-  const mcp = toNodeHandler(
-    createMcpHandler(({ authInfo }) => mcpServer(sql, authInfo?.extra?.principal as AgentPrincipal)),
-  );
-  // Refuses requests addressed to other host names, which protects a local install from DNS rebinding.
-  const validateHost = hostHeaderValidation(
-    publicUrl.hostname === 'localhost' ? localhostAllowedHostnames() : [publicUrl.hostname],
-  );
+export interface Homing {
+  url: URL;
+  auth: Auth;
+  server: Server;
+  close(): Promise<void>;
+}
+
+/** Serves the web app, sign-in, and MCP at /mcp. */
+export async function startServer(sql: Sql, options: ServerOptions): Promise<Homing> {
+  const configured = options.url ?? configuredUrl;
+  const secret = options.secret ?? secretFor(configured, options.host);
+  const proxies = trustedProxies(options.trustedProxies ?? process.env.HOMING_TRUSTED_PROXIES);
+  let app: App | undefined;
+  let mcp: ReturnType<typeof toNodeHandler>;
+  let auth: ReturnType<typeof authHandler>;
+  let validateHost: ReturnType<typeof hostHeaderValidation>;
 
   const server = createServer(async (req, res) => {
     try {
+      if (!app) {
+        res.writeHead(503).end();
+        return;
+      }
       if (!validateHost(req, res)) return;
-      if (new URL(req.url ?? '/', publicUrl).pathname !== '/mcp') {
-        res.writeHead(404).end();
-        return;
+      // Sign-in's rate limits go by this address, never by one the client claims.
+      req.headers[clientAddressHeader] = clientAddress(req, proxies);
+      const path = new URL(req.url ?? '/', app.url).pathname;
+      if (path === '/mcp') {
+        const token = /^Bearer (\S+)$/i.exec(req.headers.authorization ?? '')?.[1];
+        const principal = token && (await authenticate(sql, token));
+        if (!principal) {
+          res.writeHead(401, { 'www-authenticate': 'Bearer' }).end();
+          return;
+        }
+        const info: AuthInfo = { token: '', clientId: principal.agent, scopes: [], extra: { principal } };
+        await mcp(Object.assign(req, { auth: info }) as IncomingMessage & { auth: AuthInfo }, res);
+      } else if (path.startsWith('/api/auth/')) {
+        if (authEndpoints.has(`${req.method} ${path.slice('/api/auth'.length)}`)) await auth(req, res);
+        else res.writeHead(404).end();
+      } else if (path.startsWith('/api/')) {
+        await handleApi(app, req, res, path);
+      } else {
+        await serveApp(app, req, res, path);
       }
-      const token = /^Bearer (\S+)$/i.exec(req.headers.authorization ?? '')?.[1];
-      const principal = token && (await authenticate(sql, token));
-      if (!principal) {
-        res.writeHead(401, { 'www-authenticate': 'Bearer' }).end();
-        return;
-      }
-      const auth: AuthInfo = { token: '', clientId: principal.agent, scopes: [], extra: { principal } };
-      await mcp(Object.assign(req, { auth }) as IncomingMessage & { auth: AuthInfo }, res);
     } catch (error) {
       console.error(error);
       if (!res.headersSent) res.writeHead(500).end();
     }
   });
 
-  return new Promise((resolve) => server.listen(options.port, options.host, () => resolve(server)));
+  await new Promise<void>((resolve) => server.listen(options.port, options.host, resolve));
+  const url = configured ?? new URL(`http://localhost:${(server.address() as AddressInfo).port}`);
+  const pool = new Pool({ connectionString: options.authDatabase ?? authDatabaseUrl, options: '-c search_path=auth' });
+  const homingAuth = createAuth(sql, pool, {
+    url,
+    secret,
+    passwords: process.env.HOMING_PASSWORDS !== 'off',
+    rateLimit: options.rateLimit ?? !isLocal(url),
+  });
+
+  mcp = toNodeHandler(createMcpHandler(({ authInfo }) => mcpServer(sql, authInfo?.extra?.principal as AgentPrincipal)));
+  auth = authHandler(homingAuth);
+  // Refuses requests addressed to other host names, which protects a local install from DNS rebinding.
+  validateHost = hostHeaderValidation(isLocal(url) ? localhostAllowedHostnames() : [url.hostname]);
+  app = { sql, auth: homingAuth, url };
+
+  return {
+    url,
+    auth: homingAuth,
+    server,
+    close: async () => {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+      await pool.end();
+    },
+  };
+}
+
+/** Where Homing is reached, which decides the host names it answers to. */
+const configuredUrl = process.env.HOMING_URL ? new URL(process.env.HOMING_URL) : undefined;
+
+function isLocal(url: URL): boolean {
+  return ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+}
+
+// Anyone could sign sessions with this one, so only a server that is reached
+// at localhost and listens there alone may use it, as when developing Homing.
+const developmentSecret = 'homing-development-secret-for-localhost-only';
+
+function secretFor(url: URL | undefined, host: string | undefined): string {
+  const secret = process.env.HOMING_SECRET;
+  if (secret && secret.length >= 32) return secret;
+  if (!secret && (!url || isLocal(url)) && ['127.0.0.1', 'localhost', '::1'].includes(host ?? '')) return developmentSecret;
+  throw new Error(
+    'Homing needs a secret of its own to sign people in. Set HOMING_SECRET to at least 32 random characters, ' +
+      'such as the output of `openssl rand -base64 32`, and keep it: changing it signs everyone out and disconnects their assistants.',
+  );
+}
+
+/** The proxies whose X-Forwarded-For Homing believes, from addresses and ranges like `10.0.0.0/8`. */
+function trustedProxies(list = ''): BlockList {
+  const trusted = new BlockList();
+  for (const entry of list.split(',').map((item) => item.trim()).filter(Boolean)) {
+    const [address, prefix] = entry.split('/');
+    const version = isIP(address);
+    if (!version) throw new Error(`HOMING_TRUSTED_PROXIES has ${entry}, which isn't an IP address or range.`);
+    if (prefix) trusted.addSubnet(address, Number(prefix), version === 6 ? 'ipv6' : 'ipv4');
+    else trusted.addAddress(address, version === 6 ? 'ipv6' : 'ipv4');
+  }
+  return trusted;
+}
+
+/**
+ * Who a request comes from: the address of the connection, or, when that is
+ * a proxy Homing trusts, the address the proxy says it forwarded for.
+ */
+function clientAddress(req: IncomingMessage, trusted: BlockList): string {
+  const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',').map((item) => item.trim()).filter(Boolean);
+  const plain = (address?: string) => address?.replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  const isTrusted = (address: string) => isIP(address) > 0 && trusted.check(address, isIP(address) === 6 ? 'ipv6' : 'ipv4');
+  let address = plain(req.socket.remoteAddress);
+  while (address && isTrusted(address) && forwarded.length) address = plain(forwarded.pop());
+  return address && isIP(address) ? address : '';
 }
 
 // Migrations run as a separate step before this, so the server never holds the admin role.
 if (import.meta.main) {
+  const sql = connect();
   const port = Number(process.env.PORT ?? 4100);
-  await startServer(connect(), { port, host: process.env.HOST ?? '127.0.0.1' });
-  console.log(`Homing is serving MCP at ${new URL('/mcp', publicUrl)}`);
+  const homing = await startServer(sql, { port, host: process.env.HOST ?? '127.0.0.1' });
+  console.log(`Homing is running at ${homing.url}, with MCP at ${new URL('/mcp', homing.url)}`);
+  const link = await setupLink(sql, homing.url);
+  if (link) {
+    console.log(`\nCreate the first account with this link. It also looks after this Homing, and works for an hour:\n\n  ${link}\n\nRestart Homing for a new link.\n`);
+  }
 }

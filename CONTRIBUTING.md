@@ -14,6 +14,23 @@ npm test                  # recreates the test database and runs the tests
 npm run dev:web           # the screens, with sample data, at http://localhost:5173
 ```
 
+### Running it
+
+```sh
+echo "HOMING_SECRET=$(openssl rand -base64 32)" >> .env   # once
+docker compose up -d --build
+docker compose logs homing   # shows the link for creating the first account
+```
+
+Open the link to create your account with a passkey. It works once, for an hour; restart Homing for a new one. Homing reads these settings:
+
+| Setting | What it does |
+|---|---|
+| `HOMING_URL` | Where people and assistants reach Homing, such as `https://homing.example.com`. Passkeys belong to its host name. Defaults to `http://localhost:4100` |
+| `HOMING_SECRET` | Signs sessions: at least 32 random characters, such as from `openssl rand -base64 32`. Homing won't start without one, except when it listens only on localhost, as `npm test` does. Changing it signs everyone out |
+| `HOMING_PASSWORDS` | `off` turns off signing in with a password. Passkeys always work |
+| `HOMING_TRUSTED_PROXIES` | The reverse proxies in front of Homing, as addresses or ranges like `172.16.0.0/12`. Only their `X-Forwarded-For` counts for sign-in's rate limits; otherwise Homing uses the connection's own address |
+
 ### Trying it with Claude Code
 
 Until Homing has sign-in, a small command-line tool sets up people, spaces, tokens, rules and skills. Each command prints what it creates, and `node src/cli.ts` lists them all.

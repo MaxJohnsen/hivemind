@@ -63,7 +63,9 @@ Figtree is the only typeface, and it ships with the app. Page titles are 24 px, 
 ## Layout
 
 - The mark and name sit top left, the person's name top right.
-- Sign-in asks for the email first, then the passkey or password, and the email field offers saved passkeys directly. On a desktop the form is on the left and the illustration on the right, with the tagline; on a phone only the form shows, starting near the top.
+- Sign-in asks for the email first, then the passkey or password, and the email field offers saved passkeys directly. Every email gets the same next step, so the page never says whether an account exists. On a desktop the form is on the left and the illustration on the right, with the tagline; on a phone only the form shows, starting near the top.
+- Joining has the same layout, with the welcome drawing. The setup link creates the first account, and an invite everyone else's. A link that no longer works says what to do instead.
+- The account page is one centered column, like decision pages. Removing a passkey asks first, in place, and the last way to sign in can't be removed.
 - Sign-in with Google or Microsoft uses the providers' own marks, as their guidelines ask.
 - Decision pages are one centered column with a single heading that says who wants what, where.
 
@@ -94,4 +96,4 @@ Inside Claude and ChatGPT the approval card takes the host's colors, font and co
 
 ## Working on screens
 
-`npm run dev:web` serves every screen with sample data, and its start page lists them, each state at its own address.
+`npm run dev:web` serves every screen with sample data, and its start page lists them, each state at its own address. The real pages come from Homing itself: run `npm run build:web`, then start the server.

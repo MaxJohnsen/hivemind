@@ -27,7 +27,7 @@ import {
 } from '../src/knowledge.ts';
 import { saveSkill, skillsFor } from '../src/skills.ts';
 import { addMember, createSpace, listSpaces, peopleNames } from '../src/spaces.ts';
-import { admin, as, db, person, refused, type Person } from './helpers.ts';
+import { admin, as, authDb, db, person, refused, type Person } from './helpers.ts';
 
 interface Client {
   name: string;
@@ -271,6 +271,23 @@ describe('straight against the database', () => {
       as(acme.person, (s) => s.tx`create temp table space_access (person_id uuid, space_id uuid, admin boolean)`),
       refused,
     );
+  });
+
+  test('sign-in and Homing can’t read each other’s tables', async () => {
+    const [role] = await authDb`select rolsuper, rolbypassrls from pg_roles where rolname = current_user`;
+    assert.deepEqual(role, { rolsuper: false, rolbypassrls: false });
+
+    for (const { schema, name } of await admin`select schemaname as schema, tablename as name from pg_tables where schemaname in ('public', 'auth')`) {
+      const sql = schema === 'public' ? authDb : db;
+      await assert.rejects(sql.unsafe(`select * from ${schema}."${name}" limit 1`), refused, `${schema}.${name}`);
+    }
+    // Nor can sign-in use Homing's functions that change people, spaces or access.
+    const usable = await admin`
+      select proname from pg_proc
+      where pronamespace = 'public'::regnamespace and prosecdef and prorettype <> 'trigger'::regtype
+        and has_function_privilege('homing_auth', oid, 'execute')
+    `;
+    assert.deepEqual(usable.map((row) => row.proname), []);
   });
 
   test('Homing’s role is restricted, and every table it can read is protected', async () => {

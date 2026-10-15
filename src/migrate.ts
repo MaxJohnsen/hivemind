@@ -1,17 +1,20 @@
 import { readdir, readFile } from 'node:fs/promises';
 import postgres from 'postgres';
-import { adminUrl, databaseUrl } from './db.ts';
+import { adminUrl, authDatabaseUrl, databaseUrl } from './db.ts';
 
 const directory = new URL('../migrations/', import.meta.url);
 
 /**
- * Applies new migrations as the admin role, then lets the restricted role
- * log in with the password from the app's database URL.
+ * Applies new migrations as the admin role, then lets the restricted roles
+ * log in with the passwords from their database URLs.
  */
-export async function migrate(admin = adminUrl, app = databaseUrl): Promise<void> {
-  const { username, password } = new URL(app);
-  if (username !== 'homing_app') {
-    throw new Error('DATABASE_URL must connect as homing_app');
+export async function migrate(admin = adminUrl, app = databaseUrl, auth = authDatabaseUrl): Promise<void> {
+  const logins = [
+    { role: 'homing_app', url: new URL(app), setting: 'DATABASE_URL' },
+    { role: 'homing_auth', url: new URL(auth), setting: 'AUTH_DATABASE_URL' },
+  ];
+  for (const { role, url, setting } of logins) {
+    if (url.username !== role) throw new Error(`${setting} must connect as ${role}`);
   }
 
   const sql = postgres(admin, { max: 1, onnotice: () => {} });
@@ -30,10 +33,12 @@ export async function migrate(admin = adminUrl, app = databaseUrl): Promise<void
         await tx.unsafe(await readFile(new URL(file, directory), 'utf8'));
         await tx`insert into schema_migrations (name) values (${file})`;
       }
-      const [{ statement }] = await tx`
-        select format('alter role homing_app with login password %L', ${decodeURIComponent(password)}::text) as statement
-      `;
-      await tx.unsafe(statement);
+      for (const { role, url } of logins) {
+        const [{ statement }] = await tx`
+          select format('alter role %I with login password %L', ${role}::text, ${decodeURIComponent(url.password)}::text) as statement
+        `;
+        await tx.unsafe(statement);
+      }
     });
   } finally {
     await sql.end();
