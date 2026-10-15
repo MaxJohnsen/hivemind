@@ -138,6 +138,7 @@ export function SignIn({
                 <Button type="submit" size="lg" className="h-11 w-full text-[15px]" disabled={busy}>Sign in</Button>
               </form>
             )}
+            <a href="/recover" className="w-fit text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Can't sign in?</a>
           </>
         )}
       </FormCard>

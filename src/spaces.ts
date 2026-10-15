@@ -18,7 +18,7 @@ export interface Space {
   admin: boolean;
 }
 
-/** Creates a person with their personal space. */
+/** Creates a person with their personal space. Homing does it only for an invite, and tests as the admin role. */
 export async function createPerson(sql: Sql, name: string): Promise<Person> {
   const [person] = await sql<Person[]>`
     select person_id as id, personal_space_id from create_person(${name})

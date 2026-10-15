@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import type { Sql } from './db.ts';
+import type { Session, Sql } from './db.ts';
 
 /** A one-time link for creating an account. Only a hash of its token is kept. */
 export function inviteLink(url: URL, token: string, page = 'join'): string {
@@ -17,9 +17,27 @@ export async function setupLink(sql: Sql, url: URL): Promise<string | undefined>
   return created ? inviteLink(url, token, 'setup') : undefined;
 }
 
-/** What an invite that can still be used is for. */
-export async function findInvite(sql: Sql, token: string): Promise<{ instanceAdmin: boolean } | undefined> {
-  const [invite] = await sql<{ instanceAdmin: boolean }[]>`select instance_admin from find_invite(${hash(token)})`;
+/**
+ * A new invite from the instance admin. It works once, for a week. If it is
+ * sent to an email address, accepting it with that address verifies it.
+ */
+export async function createInvite(s: Session, url: URL, email?: string): Promise<{ link: string; expiresAt: Date }> {
+  const token = newToken();
+  const [{ expiresAt }] = await s.tx<{ expiresAt: Date }[]>`select create_invite(${hash(token)}, ${email ?? null}) as expires_at`;
+  return { link: inviteLink(url, token), expiresAt };
+}
+
+/** An invite that can still be used. */
+export interface Invite {
+  instanceAdmin: boolean;
+  /** The address it was sent to, if it was sent. */
+  email: string | null;
+  /** The name of whoever sent it. */
+  invitedBy: string | null;
+}
+
+export async function findInvite(sql: Sql, token: string): Promise<Invite | undefined> {
+  const [invite] = await sql<Invite[]>`select instance_admin, email, invited_by from find_invite(${hash(token)})`;
   return invite;
 }
 
@@ -34,10 +52,21 @@ export interface Ticket {
   person: string;
   name: string;
   email: string;
+  /** Whether the invite went to this email, which proves it's theirs. */
+  emailVerified: boolean;
+  /** Whether the account becomes the instance admin, which signs in only with passkeys. */
+  instanceAdmin: boolean;
 }
 
-export function newTicket(input: { token: string; name: string; email: string }): Ticket {
-  return { invite: hash(input.token).toString('base64url'), person: randomUUID(), name: input.name, email: input.email };
+export function newTicket(invite: Invite, input: { token: string; name: string; email: string }): Ticket {
+  return {
+    invite: hash(input.token).toString('base64url'),
+    person: randomUUID(),
+    name: input.name,
+    email: input.email,
+    emailVerified: invite.email === input.email,
+    instanceAdmin: invite.instanceAdmin,
+  };
 }
 
 /** Creates the ticket's person, with their personal space, and uses up the invite. */

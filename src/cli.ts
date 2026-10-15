@@ -1,15 +1,21 @@
-// Sets up people, spaces, rules and skills, until Homing's web app and
-// assistants can. Everything here is a person editing directly.
+// Sets up spaces, rules and skills, until Homing's web app and assistants
+// can, and gives people a sign-in link when they can't sign in. Everything
+// here is a person editing directly.
 
+import { randomBytes } from 'node:crypto';
+import { Pool } from 'pg';
 import { authDatabaseUrl, connect, withPrincipal } from './db.ts';
 import { addRule, editRule, removeRule, rulesFor, type Rule, type RuleKind } from './guidance.ts';
 import { readSkillFolder, removeSkill, saveSkill, skillsFor } from './skills.ts';
-import { addMember, createPerson, createSpace, listSpaces, type Space } from './spaces.ts';
+import { createAuth } from './auth.ts';
+import { operatorSignInLink } from './recovery.ts';
+import { configuredUrl } from './server.ts';
+import { addMember, createSpace, listSpaces, type Space } from './spaces.ts';
 
 const usage = `Usage: node src/cli.ts <command>
 
   people                                  Everyone with an account, with their ids
-  add-person <name>                       Prints the new person's id
+  sign-in-link <email>                    A one-time link for someone who can't sign in
   add-space <person> <name> [parent]      Prints the new space's id
   add-member <admin> <space> <person>
   spaces <person>
@@ -46,8 +52,18 @@ try {
     } finally {
       await accounts.end();
     }
-  } else if (command === 'add-person' && args.length === 1) {
-    console.log((await createPerson(sql, args[0])).id);
+  } else if (command === 'sign-in-link' && args.length === 1) {
+    const url = configuredUrl ?? new URL('http://localhost:4100');
+    const pool = new Pool({ connectionString: authDatabaseUrl, options: '-c search_path=auth' });
+    try {
+      // Making a sign-in link signs nothing, so the command line needs no secret of the server's.
+      const secret = randomBytes(32).toString('base64url');
+      const auth = createAuth(sql, pool, { url, secret, passwords: false, rateLimit: false, assistantSites: [] });
+      const link = await operatorSignInLink(auth, url, args[0]);
+      console.log(link ? `Send this to them. It signs them in once, within 15 minutes:\n\n  ${link}` : 'There is no account with that email.');
+    } finally {
+      await pool.end();
+    }
   } else if (command === 'add-space' && (args.length === 2 || args.length === 3)) {
     console.log(await as(args[0], (s) => createSpace(s, { name: args[1], parentId: args[2] })));
   } else if (command === 'add-member' && args.length === 3) {

@@ -7,6 +7,7 @@ import { Pool } from 'pg';
 import { tokenVerifier, type AgentPrincipal } from './assistants.ts';
 import { authEndpoints, clientAddressHeader, createAuth, type Auth, type AuthSettings } from './auth.ts';
 import { authDatabaseUrl, connect, type Sql } from './db.ts';
+import { smtpMailer, type Mailer } from './email.ts';
 import { setupLink } from './invites.ts';
 import { mcpServer } from './mcp.ts';
 import { handleApi, serveApp, type App } from './web.ts';
@@ -28,6 +29,10 @@ export interface ServerOptions {
   fetchClientMetadata?: AuthSettings['fetchClientMetadata'];
   /** The sites whose assistants may connect. By default HOMING_ASSISTANT_SITES, or Claude's and ChatGPT's. */
   assistantSites?: string[];
+  /** Sends email. By default from SMTP_URL, if it's set. */
+  mailer?: Mailer;
+  /** Whether people may sign in with a password. On unless HOMING_PASSWORDS is off. */
+  passwords?: boolean;
 }
 
 export interface Homing {
@@ -91,14 +96,16 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
     server.close();
     throw new Error('HOMING_URL must use https, unless it is localhost: passkeys and assistants need it.');
   }
+  const mailer = 'mailer' in options ? options.mailer : smtpMailer();
   const pool = new Pool({ connectionString: options.authDatabase ?? authDatabaseUrl, options: '-c search_path=auth' });
   const homingAuth = createAuth(sql, pool, {
     url,
     secret,
-    passwords: process.env.HOMING_PASSWORDS !== 'off',
+    passwords: options.passwords ?? process.env.HOMING_PASSWORDS !== 'off',
     rateLimit: options.rateLimit ?? !isLocal(url),
     fetchClientMetadata: options.fetchClientMetadata,
     assistantSites: options.assistantSites ?? assistantSites,
+    mailer,
   });
   verifyToken = tokenVerifier(homingAuth, pool, url);
 
@@ -106,7 +113,7 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
   auth = authHandler(homingAuth);
   // Refuses requests addressed to other host names, which protects a local install from DNS rebinding.
   validateHost = hostHeaderValidation(isLocal(url) ? localhostAllowedHostnames() : [url.hostname]);
-  app = { sql, auth: homingAuth, authPool: pool, url };
+  app = { sql, auth: homingAuth, authPool: pool, url, mailer };
 
   return {
     url,
@@ -124,7 +131,7 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
 const assistantSites = (process.env.HOMING_ASSISTANT_SITES || 'claude.ai,chatgpt.com').split(',').map((site) => site.trim()).filter(Boolean);
 
 /** Where Homing is reached, which decides the host names it answers to. */
-const configuredUrl = process.env.HOMING_URL ? new URL(process.env.HOMING_URL) : undefined;
+export const configuredUrl = process.env.HOMING_URL ? new URL(process.env.HOMING_URL) : undefined;
 
 function isLocal(url: URL): boolean {
   return ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
@@ -140,7 +147,7 @@ function secretFor(url: URL | undefined, host: string | undefined): string {
   if (!secret && (!url || isLocal(url)) && ['127.0.0.1', 'localhost', '::1'].includes(host ?? '')) return developmentSecret;
   throw new Error(
     'Homing needs a secret of its own to sign people in. Set HOMING_SECRET to at least 32 random characters, ' +
-      'such as the output of `openssl rand -base64 32`, and keep it: changing it signs everyone out and disconnects their assistants.',
+      'such as the output of `openssl rand -base64 32`, and keep it. See docs/deployment.md.',
   );
 }
 

@@ -43,7 +43,11 @@ export const longProposal: Proposal = {
 export const sampleAccount: AccountData = {
   name: 'Ana Berg',
   email: 'ana@acme.no',
+  emailVerified: true,
+  canEmail: true,
   instanceAdmin: false,
+  passwords: true,
+  password: false,
   passkeys: [
     { id: 'mac', name: 'Mac', createdAt: '2026-10-14T09:12:00Z' },
     { id: 'iphone', name: 'iPhone', createdAt: '2026-10-15T18:40:00Z' },

@@ -6,6 +6,7 @@ import { CardPreview } from '@/screens/card-preview';
 import { Confirm } from '@/screens/confirm';
 import { Connect } from '@/screens/connect';
 import { Join } from '@/screens/join';
+import { Recover } from '@/screens/recover';
 import { SignIn } from '@/screens/sign-in';
 
 // Every screen with sample data, for `npm run dev:web`. Each state has its own address for review.
@@ -18,12 +19,18 @@ const screens: Record<string, { label: string; render: () => ReactNode }> = {
   '/sign-in/wrong': { label: 'Sign in: wrong password', render: () => <SignIn initial="wrong" email="ana@acme.no" /> },
   '/setup': { label: 'Create the first account', render: () => <Join state={{ step: 'form', kind: 'setup' }} /> },
   '/setup/expired': { label: 'Setup link expired', render: () => <Join state={{ step: 'expired', kind: 'setup' }} /> },
-  '/join': { label: 'Join with an invite', render: () => <Join state={{ step: 'form', kind: 'invite' }} /> },
+  '/join': { label: 'Join with an invite', render: () => <Join state={{ step: 'form', kind: 'invite', invitedBy: 'Max Aasbø', email: 'ana@acme.no', passwords: true }} /> },
   '/join/taken': { label: 'Join: email already has an account', render: () => <Join state={{ step: 'form', kind: 'invite' }} problem={{ field: 'email', message: 'There is already an account with this email. Sign in instead.' }} /> },
   '/join/expired': { label: 'Invite expired', render: () => <Join state={{ step: 'expired', kind: 'invite' }} /> },
   '/join/signed-in': { label: 'Invite opened while signed in', render: () => <Join state={{ step: 'signed-in', email: 'ana@acme.no' }} /> },
   '/account': { label: 'Your account', render: () => <Account account={sampleAccount} /> },
-  '/account/welcome': { label: 'Your account, just created', render: () => <Account account={{ ...sampleAccount, passkeys: sampleAccount.passkeys.slice(0, 1), assistants: [] }} welcome /> },
+  '/account/welcome': { label: 'Your account, just created', render: () => <Account account={{ ...sampleAccount, passkeys: sampleAccount.passkeys.slice(0, 1), assistants: [], emailVerified: false }} notice="welcome" /> },
+  '/account/admin': { label: 'Your account, looking after Homing', render: () => <Account account={{ ...sampleAccount, instanceAdmin: true }} /> },
+  '/account/password': { label: 'Your account, with a password', render: () => <Account account={{ ...sampleAccount, password: true, passkeys: [] }} /> },
+  '/account/recovered': { label: 'Signed in with a sign-in link', render: () => <Account account={sampleAccount} notice="recovered" /> },
+  '/recover': { label: 'Can’t sign in', render: () => <Recover recovery="email" /> },
+  '/recover/sent': { label: 'Can’t sign in: link sent', render: () => <Recover recovery="email" initial="sent" /> },
+  '/recover/operator': { label: 'Can’t sign in, without email', render: () => <Recover recovery="operator" /> },
   '/connect': { label: 'Claude wants to use Homing as you', render: () => <Connect assistant={{ name: 'Claude', site: 'claude.ai' }} person="Ana Berg" /> },
   '/confirm': { label: 'Confirm a rule', render: () => <Confirm proposal={proposal} /> },
   '/confirm/long': { label: 'Confirm a longer rule', render: () => <Confirm proposal={longProposal} /> },

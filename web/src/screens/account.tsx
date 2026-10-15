@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Check, CircleCheck, Copy, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { FieldError } from '@/components/ui/field';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { Wordmark } from '@/components/wordmark';
 import empty from '@/assets/illustrations/empty.png';
 
@@ -21,7 +22,13 @@ export interface ConnectedAssistant {
 export interface AccountData {
   name: string;
   email: string;
+  emailVerified: boolean;
+  /** Whether Homing can send email. */
+  canEmail: boolean;
   instanceAdmin: boolean;
+  /** Whether accounts may have a password, and whether this one has. */
+  passwords: boolean;
+  password: boolean;
   passkeys: Passkey[];
   assistants: ConnectedAssistant[];
   /** The address assistants connect to. */
@@ -33,12 +40,28 @@ export interface AccountActions {
   disconnect(clientId: string): Promise<string | undefined>;
   addPasskey(): Promise<string | undefined>;
   removePasskey(id: string): Promise<string | undefined>;
+  setPassword(password: string, current?: string): Promise<string | undefined>;
+  verifyEmail(): Promise<string | undefined>;
+  invite(email?: string): Promise<InviteMade | { problem: string }>;
   signInAgain(): Promise<void>;
   signOut(): Promise<void>;
 }
 
-/** Your account: the assistants that use Homing as you, and how you sign in. */
-export function Account({ account, welcome, actions }: { account: AccountData; welcome?: boolean; actions?: AccountActions }) {
+/** An invite just made: a link to share, or sent by email straight to the person. */
+export type InviteMade = { link: string; expiresAt: string; emailed: false } | { to: string; expiresAt: string; emailed: true };
+
+/** Shown once, after something that brought you here. */
+export type AccountNotice = 'welcome' | 'recovered' | 'verified';
+
+const notices: Record<AccountNotice, (account: AccountData) => { title: string; text: string }> = {
+  welcome: (account) => ({ title: `Welcome, ${account.name.split(' ')[0]}`, text: 'Your account is ready. Next, connect your assistant.' }),
+  recovered: () => ({ title: "You're signed in", text: 'Add a passkey on this device now, so you can sign in next time.' }),
+  verified: () => ({ title: 'Your email is verified', text: 'If you ever can’t sign in, Homing can send you a sign-in link.' }),
+};
+
+/** Your account: the assistants that use Homing as you, how you sign in, and inviting people. */
+export function Account({ account, notice, actions }: { account: AccountData; notice?: AccountNotice; actions?: AccountActions }) {
+  const shown = notice && notices[notice](account);
   return (
     <div className="min-h-dvh">
       <header className="mx-auto flex w-full max-w-xl items-center justify-between px-4 py-5">
@@ -47,20 +70,30 @@ export function Account({ account, welcome, actions }: { account: AccountData; w
       </header>
 
       <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-16">
-        {welcome ? (
+        {shown ? (
           <div className="flex items-start gap-3 rounded-xl bg-change p-5" role="status">
             <CircleCheck aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-primary" />
             <div className="flex flex-col gap-1">
-              <h1 className="text-xl font-semibold tracking-tight">Welcome, {account.name.split(' ')[0]}</h1>
-              <p className="text-[15px] text-muted-foreground">Your account is ready. Next, connect your assistant.</p>
+              <h1 className="text-xl font-semibold tracking-tight">{shown.title}</h1>
+              <p className="text-[15px] text-muted-foreground">{shown.text}</p>
             </div>
           </div>
         ) : (
           <h1 className="text-2xl font-semibold tracking-tight">Your account</h1>
         )}
 
-        <Assistants account={account} actions={actions} />
-        <SignInMethods account={account} actions={actions} />
+        {notice === 'recovered' ? (
+          <>
+            <SignInMethods account={account} actions={actions} restoring />
+            <Assistants account={account} actions={actions} />
+          </>
+        ) : (
+          <>
+            <Assistants account={account} actions={actions} />
+            <SignInMethods account={account} actions={actions} />
+          </>
+        )}
+        {account.instanceAdmin && <Invite account={account} actions={actions} />}
 
         <div>
           <Button variant="outline" size="lg" className="h-11 text-[15px] sm:px-5" onClick={() => actions?.signOut()}>Sign out</Button>
@@ -165,7 +198,8 @@ function siteOf(clientId: string): string {
   }
 }
 
-function SignInMethods({ account, actions }: { account: AccountData; actions?: AccountActions }) {
+/** How you sign in. After a sign-in link, adding a passkey is the one thing to do, so it leads. */
+function SignInMethods({ account, actions, restoring }: { account: AccountData; actions?: AccountActions; restoring?: boolean }) {
   const [message, setMessage] = useState<string>();
   const [staleSession, setStaleSession] = useState(false);
   const [removing, setRemoving] = useState<string>();
@@ -184,10 +218,12 @@ function SignInMethods({ account, actions }: { account: AccountData; actions?: A
     <section aria-labelledby="sign-in-heading" className="flex flex-col gap-5 rounded-xl border bg-card p-6 sm:p-8">
       <div className="flex flex-col gap-1">
         <h2 id="sign-in-heading" className="text-lg font-semibold tracking-tight">How you sign in</h2>
-        <p className="text-[15px] text-muted-foreground">With your email, {account.email}, and a passkey.</p>
+        <p className="text-[15px] text-muted-foreground">
+          With your email, {account.email}, and {account.password ? (account.passkeys.length ? 'a passkey or your password' : 'your password') : 'a passkey'}.
+        </p>
       </div>
 
-      <ul className="flex flex-col divide-y rounded-lg border">
+      <ul className="flex flex-col divide-y rounded-lg border empty:hidden">
         {account.passkeys.map((passkey) => (
           <li key={passkey.id} className="flex flex-col gap-3 px-4 py-3">
             <div className="flex items-center gap-3">
@@ -196,7 +232,7 @@ function SignInMethods({ account, actions }: { account: AccountData; actions?: A
                 <span className="truncate text-[15px] font-medium">{passkey.name ? `Passkey on ${passkey.name}` : 'Passkey'}</span>
                 <span className="text-sm text-muted-foreground">Added {date.format(new Date(passkey.createdAt))}</span>
               </div>
-              {account.passkeys.length > 1 && removing !== passkey.id && (
+              {(account.passkeys.length > 1 || account.password) && removing !== passkey.id && (
                 <Button variant="outline" size="sm" onClick={() => setRemoving(passkey.id)}>Remove</Button>
               )}
             </div>
@@ -219,7 +255,7 @@ function SignInMethods({ account, actions }: { account: AccountData; actions?: A
 
       <div className="flex flex-col gap-3">
         <div>
-          <Button variant="outline" size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy} onClick={() => actions && run(actions.addPasskey)}>
+          <Button variant={restoring ? 'default' : 'outline'} size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy} onClick={() => actions && run(actions.addPasskey)}>
             <KeyRound data-icon="inline-start" />Add a passkey
           </Button>
         </div>
@@ -231,9 +267,147 @@ function SignInMethods({ account, actions }: { account: AccountData; actions?: A
           </div>
         )}
       </div>
+
+      {account.canEmail && !account.emailVerified && <VerifyEmail actions={actions} />}
+      {account.instanceAdmin ? (
+        <p className="border-t pt-5 text-sm text-muted-foreground">This account looks after Homing, so it signs in only with passkeys.</p>
+      ) : (
+        account.passwords && <Password account={account} actions={actions} />
+      )}
     </section>
   );
 }
 
-/** Shown when adding a passkey needs a fresh sign-in. */
-export const signInAgainMessage = 'For your safety, sign in again before adding a passkey.';
+function VerifyEmail({ actions }: { actions?: AccountActions }) {
+  const [state, setState] = useState<'idle' | 'sent' | string>('idle');
+  return (
+    <div className="flex flex-col gap-3 border-t pt-5">
+      <p className="text-[15px]">Verify your email, so Homing can send you a sign-in link if you ever can't sign in.</p>
+      {state === 'sent' ? (
+        <p className="text-sm text-muted-foreground" role="status">Check your email for the link.</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" size="lg" className="h-11 text-[15px] sm:px-5" onClick={async () => setState((await actions?.verifyEmail()) ?? 'sent')}>
+            Send me a link
+          </Button>
+          {state !== 'idle' && <FieldError>{state}</FieldError>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Password({ account, actions }: { account: AccountData; actions?: AccountActions }) {
+  const [open, setOpen] = useState(false);
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [message, setMessage] = useState<string>();
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (next.length < 10) return setMessage('Use a password of at least 10 characters.');
+    if (!actions) return;
+    setBusy(true);
+    const problem = await actions.setPassword(next, account.password ? current : undefined);
+    setMessage(problem);
+    setDone(!problem);
+    if (!problem) setOpen(false);
+    setBusy(false);
+  };
+
+  if (!open) {
+    return (
+      <div className="flex flex-col gap-3 border-t pt-5">
+        {!account.password && <p className="text-[15px]">You can also add a password, for devices without passkeys.</p>}
+        {done && <p className="text-sm text-muted-foreground" role="status">Saved.</p>}
+        <div>
+          <Button variant="outline" size="lg" className="h-11 text-[15px] sm:px-5" onClick={() => { setDone(false); setOpen(true); }}>
+            {account.password ? 'Change password' : 'Add a password'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form className="flex flex-col gap-4 border-t pt-5" onSubmit={save} noValidate>
+      {account.password && (
+        <Field>
+          <FieldLabel htmlFor="current-password">Current password</FieldLabel>
+          <Input id="current-password" type="password" autoComplete="current-password" className="h-11" value={current} onChange={(event) => setCurrent(event.target.value)} autoFocus />
+        </Field>
+      )}
+      <Field data-invalid={Boolean(message) || undefined}>
+        <FieldLabel htmlFor="new-password">{account.password ? 'New password' : 'Password'}</FieldLabel>
+        <Input id="new-password" type="password" autoComplete="new-password" className="h-11" value={next} onChange={(event) => setNext(event.target.value)} aria-invalid={Boolean(message) || undefined} autoFocus={!account.password} />
+        {message ? <FieldError>{message}</FieldError> : <p className="text-sm text-muted-foreground">At least 10 characters.</p>}
+      </Field>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button type="button" variant="outline" size="lg" className="h-11 text-[15px] sm:px-5" onClick={() => setOpen(false)}>Cancel</Button>
+        <Button type="submit" variant="outline" size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy}>Save password</Button>
+      </div>
+    </form>
+  );
+}
+
+function Invite({ account, actions }: { account: AccountData; actions?: AccountActions }) {
+  const [email, setEmail] = useState('');
+  const [invite, setInvite] = useState<InviteMade>();
+  const [message, setMessage] = useState<string>();
+  const [busy, setBusy] = useState(false);
+
+  const create = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!actions) return;
+    setBusy(true);
+    setMessage(undefined);
+    const result = await actions.invite(email.trim() || undefined);
+    if ('problem' in result) setMessage(result.problem);
+    else {
+      setInvite(result);
+      setEmail('');
+    }
+    setBusy(false);
+  };
+
+  return (
+    <section aria-labelledby="invite-heading" className="flex flex-col gap-5 rounded-xl border bg-card p-6 sm:p-8">
+      <div className="flex flex-col gap-1">
+        <h2 id="invite-heading" className="text-lg font-semibold tracking-tight">Invite someone</h2>
+        <p className="text-[15px] text-muted-foreground">
+          They get a link to create their own account. It works once, for a week. Being invited gives them no access to your spaces.
+        </p>
+      </div>
+
+      {invite &&
+        (invite.emailed ? (
+          <p className="text-[15px]" role="status">Sent to {invite.to}. The link goes only to them.</p>
+        ) : (
+          <div className="flex flex-col gap-2" role="status">
+            <p className="text-[15px]">Share this link with them:</p>
+            <CopyAddress value={invite.link} />
+          </div>
+        ))}
+
+      <form className="flex flex-col gap-4" onSubmit={create} noValidate>
+        {account.canEmail && (
+          <Field data-invalid={Boolean(message) || undefined}>
+            <FieldLabel htmlFor="invite-email">Their email (optional)</FieldLabel>
+            <Input id="invite-email" type="email" className="h-11" value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(message) || undefined} />
+          </Field>
+        )}
+        {message && <FieldError>{message}</FieldError>}
+        <div>
+          <Button type="submit" variant="outline" size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy}>
+            {email.trim() ? 'Send invite' : invite ? 'Make another link' : 'Make an invite link'}
+          </Button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+/** Shown when a change to how you sign in needs a fresh sign-in. */
+export const signInAgainMessage = 'For your safety, sign in again first.';
