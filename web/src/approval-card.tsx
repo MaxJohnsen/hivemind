@@ -5,12 +5,12 @@ import { ProposedChange } from '@/components/proposed-change';
 import { RuleReach } from '@/components/rule-reach';
 import { Button } from '@/components/ui/button';
 import { Wordmark } from '@/components/wordmark';
-import type { Proposal } from '@/sample';
+import { precedenceOf, type ProposalData } from '@/lib/proposals';
 
 type State = 'open' | 'added' | 'declined';
 
 /** The approval shown inside the conversation. Same parts as the page, sized for a chat. */
-export function ApprovalCard({ proposal, initial = 'open' }: { proposal: Proposal; initial?: State }) {
+export function ApprovalCard({ proposal, initial = 'open' }: { proposal: ProposalData; initial?: State }) {
   const [state, setState] = useState<State>(initial);
   const [onlyHere, setOnlyHere] = useState(false);
 
@@ -24,9 +24,9 @@ export function ApprovalCard({ proposal, initial = 'open' }: { proposal: Proposa
       {state === 'open' ? (
         <>
           <p className="text-[15px] font-medium">Add this rule to {proposal.space}?</p>
-          <ProposedChange kind={proposal.kind} text={proposal.text} />
+          <ProposedChange kind={proposal.kind} text={proposal.text!} />
           <RuleReach id="card-only-here" space={proposal.space} onlyHere={onlyHere} onOnlyHereChange={setOnlyHere} />
-          <AlreadyApplies rules={proposal.alreadyApplies} precedence={proposal.precedence} />
+          <AlreadyApplies rules={proposal.alreadyApplies} precedence={precedenceOf(proposal)} />
           <div className="flex flex-wrap gap-2">
             <Button className="h-10 px-4" onClick={() => setState('added')}>Add rule</Button>
             <Button variant="outline" className="h-10 px-4" onClick={() => setState('declined')}>Don't add</Button>
@@ -40,7 +40,7 @@ export function ApprovalCard({ proposal, initial = 'open' }: { proposal: Proposa
               : <CircleSlash aria-hidden="true" className="size-5 text-muted-foreground" />}
             {state === 'added' ? `Added to ${proposal.space}` : 'Not added. Nothing changed.'}
           </p>
-          <ProposedChange kind={proposal.kind} text={proposal.text} settled />
+          <ProposedChange kind={proposal.kind} text={proposal.text!} settled />
         </div>
       )}
     </section>

@@ -1,30 +1,27 @@
 import type { AccountData } from '@/screens/account';
-import type { RuleKind } from '@/components/proposed-change';
+import type { ProposalData } from '@/lib/proposals';
 
-// Sample data until #4 connects these screens to real proposals.
-export type Proposal = {
-  assistant: string;
-  space: string;
-  kind: RuleKind;
-  text: string;
-  alreadyApplies: { kind: RuleKind; text: string; from: string }[];
-  precedence: string;
-};
-
-export const proposal: Proposal = {
+// Claude proposes a preference for Acme, where two rules already apply.
+export const proposal: ProposalData = {
+  id: 'sample',
   assistant: 'Claude',
   space: 'Acme',
+  personal: false,
+  action: 'add',
   kind: 'preference',
   text: 'Write status reports in Norwegian.',
+  rule: null,
+  shared: true,
+  onlyHere: false,
+  state: 'open',
   alreadyApplies: [
     { kind: 'preference', text: 'Write reports in English.', from: 'your personal space' },
     { kind: 'requirement', text: 'Never name other clients in documents for Acme.', from: 'Acme' },
   ],
-  precedence: 'The new rule is more specific than your personal one, so it wins in Acme.',
 };
 
 // A longer rule, to check that every screen shows it in full and stays readable.
-export const longProposal: Proposal = {
+export const longProposal: ProposalData = {
   ...proposal,
   kind: 'requirement',
   text: [
@@ -36,7 +33,34 @@ export const longProposal: Proposal = {
     '',
     'Write them in Norwegian, keep them under one page, and send them to Gunnar before 15:00 on Fridays.',
   ].join('\n'),
-  precedence: 'Requirements always apply. If two requirements conflict, the assistant stops and tells you.',
+};
+
+// A rule only for Ana, in her personal space.
+export const personalProposal: ProposalData = {
+  ...proposal,
+  space: 'Personal',
+  personal: true,
+  text: 'Keep answers short unless I ask for detail.',
+  shared: false,
+  alreadyApplies: [],
+};
+
+// Claude proposes new wording for one of Acme's rules, and removing another.
+export const changeProposal: ProposalData = {
+  ...proposal,
+  action: 'change',
+  text: 'Write status reports in Norwegian, and the summary in English.',
+  rule: { text: 'Write status reports in Norwegian.', current: true },
+  alreadyApplies: [],
+};
+
+export const removeProposal: ProposalData = {
+  ...proposal,
+  action: 'remove',
+  kind: 'requirement',
+  text: null,
+  rule: { text: 'Never name other clients in documents for Acme.', current: true },
+  alreadyApplies: [],
 };
 
 // Ana's account, with a passkey on her laptop and one on her phone, and Claude connected.

@@ -109,7 +109,7 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
   });
   verifyToken = tokenVerifier(homingAuth, pool, url);
 
-  mcp = toNodeHandler(createMcpHandler(({ authInfo }) => mcpServer(sql, authInfo?.extra?.principal as AgentPrincipal)));
+  mcp = toNodeHandler(createMcpHandler(({ authInfo }) => mcpServer(sql, authInfo?.extra?.principal as AgentPrincipal, url)));
   auth = authHandler(homingAuth);
   // Refuses requests addressed to other host names, which protects a local install from DNS rebinding.
   validateHost = hostHeaderValidation(isLocal(url) ? localhostAllowedHostnames() : [url.hostname]);

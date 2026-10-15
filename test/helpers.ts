@@ -62,3 +62,11 @@ export async function member(url: URL, name: string) {
 }
 
 export type Member = Awaited<ReturnType<typeof member>>;
+
+/** Waits until the condition holds, such as another request waiting on a lock. */
+export async function until(condition: () => Promise<boolean>) {
+  for (let tries = 0; !(await condition()); tries++) {
+    if (tries > 100) throw new Error('timed out');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}

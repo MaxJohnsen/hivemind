@@ -1,8 +1,8 @@
 import { ChevronDown } from 'lucide-react';
-import type { Proposal } from '@/sample';
+import type { ProposalData } from '@/lib/proposals';
 
 /** The rules that already apply where a new one would go, so the person sees what it joins. */
-export function AlreadyApplies({ rules, precedence, open }: Pick<Proposal, 'precedence'> & { rules: Proposal['alreadyApplies']; open?: boolean }) {
+export function AlreadyApplies({ rules, precedence, open }: { rules: ProposalData['alreadyApplies']; precedence: string; open?: boolean }) {
   if (!rules.length) return null;
   return (
     <details open={open} className="group rounded-lg border bg-card">
@@ -11,9 +11,9 @@ export function AlreadyApplies({ rules, precedence, open }: Pick<Proposal, 'prec
         <ChevronDown aria-hidden="true" className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <ul className="flex flex-col gap-3 border-t px-4 py-3">
-        {rules.map((rule) => (
-          <li key={rule.text} className="flex flex-col gap-0.5 text-sm">
-            <span>{rule.text}</span>
+        {rules.map((rule, index) => (
+          <li key={index} className="flex flex-col gap-0.5 text-sm">
+            <span className="whitespace-pre-line">{rule.text}</span>
             <span className="text-xs text-muted-foreground">
               {rule.kind === 'requirement' ? 'Requirement' : 'Preference'}, from {rule.from}
             </span>
