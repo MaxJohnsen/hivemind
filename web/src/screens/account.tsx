@@ -59,7 +59,7 @@ const notices: Record<AccountNotice, (account: AccountData) => { title: string; 
   verified: () => ({ title: 'Your email is verified', text: 'If you ever can’t sign in, Homing can send you a sign-in link.' }),
 };
 
-/** Your account: the assistants that use Homing as you, how you sign in, and inviting people. */
+/** Your account: the assistants connected to Homing, how you sign in, and inviting people. */
 export function Account({ account, notice, actions }: { account: AccountData; notice?: AccountNotice; actions?: AccountActions }) {
   const shown = notice && notices[notice](account);
   return (
@@ -120,10 +120,10 @@ function Assistants({ account, actions }: { account: AccountData; actions?: Acco
   };
 
   return (
-    <section aria-labelledby="assistants-heading" className="flex flex-col gap-5 rounded-xl border bg-card p-6 sm:p-8">
+    <section aria-labelledby="assistants-heading" className="flex flex-col gap-4 rounded-xl border bg-card px-6 py-5 sm:px-8 sm:py-6">
       <div className="flex flex-col gap-1">
-        <h2 id="assistants-heading" className="text-lg font-semibold tracking-tight">Assistants</h2>
-        <p className="text-[15px] text-muted-foreground">They use Homing as you, with what you can see.</p>
+        <h2 id="assistants-heading" className="text-lg font-semibold tracking-tight">Connected assistants</h2>
+        <p className="text-[15px] text-muted-foreground">They can access what you can see in Homing.</p>
       </div>
 
       {account.assistants.length === 0 ? (
@@ -164,7 +164,7 @@ function Assistants({ account, actions }: { account: AccountData; actions?: Acco
       <div className="flex flex-col gap-2">
         <p className="text-[15px]">
           {account.assistants.length === 0 ? 'To connect Claude, ChatGPT or another assistant' : 'To connect another assistant'}, add
-          Homing to it as a connector with this address, then sign in and allow it.
+          Homing to it as a connector with this address, then sign in and connect it.
         </p>
         <CopyAddress value={account.mcpUrl} />
       </div>
@@ -215,7 +215,7 @@ function SignInMethods({ account, actions, restoring }: { account: AccountData; 
   };
 
   return (
-    <section aria-labelledby="sign-in-heading" className="flex flex-col gap-5 rounded-xl border bg-card p-6 sm:p-8">
+    <section aria-labelledby="sign-in-heading" className="flex flex-col gap-4 rounded-xl border bg-card px-6 py-5 sm:px-8 sm:py-6">
       <div className="flex flex-col gap-1">
         <h2 id="sign-in-heading" className="text-lg font-semibold tracking-tight">How you sign in</h2>
         <p className="text-[15px] text-muted-foreground">
@@ -259,7 +259,7 @@ function SignInMethods({ account, actions, restoring }: { account: AccountData; 
             <KeyRound data-icon="inline-start" />Add a passkey
           </Button>
         </div>
-        <p className="text-sm text-muted-foreground">Add one for each device you use, so losing one doesn't lock you out.</p>
+        <p className="text-sm text-muted-foreground">Add another passkey as a backup.</p>
         {message && (
           <div className="flex flex-wrap items-center gap-3">
             <FieldError>{message}</FieldError>
@@ -270,7 +270,7 @@ function SignInMethods({ account, actions, restoring }: { account: AccountData; 
 
       {account.canEmail && !account.emailVerified && <VerifyEmail actions={actions} />}
       {account.instanceAdmin ? (
-        <p className="border-t pt-5 text-sm text-muted-foreground">This account looks after Homing, so it signs in only with passkeys.</p>
+        <p className="border-t pt-4 text-sm text-muted-foreground">This account manages Homing. A passkey is required.</p>
       ) : (
         account.passwords && <Password account={account} actions={actions} />
       )}
@@ -281,7 +281,7 @@ function SignInMethods({ account, actions, restoring }: { account: AccountData; 
 function VerifyEmail({ actions }: { actions?: AccountActions }) {
   const [state, setState] = useState<'idle' | 'sent' | string>('idle');
   return (
-    <div className="flex flex-col gap-3 border-t pt-5">
+    <div className="flex flex-col gap-3 border-t pt-4">
       <p className="text-[15px]">Verify your email, so Homing can send you a sign-in link if you ever can't sign in.</p>
       {state === 'sent' ? (
         <p className="text-sm text-muted-foreground" role="status">Check your email for the link.</p>
@@ -319,7 +319,7 @@ function Password({ account, actions }: { account: AccountData; actions?: Accoun
 
   if (!open) {
     return (
-      <div className="flex flex-col gap-3 border-t pt-5">
+      <div className="flex flex-col gap-3 border-t pt-4">
         {!account.password && <p className="text-[15px]">You can also add a password, for devices without passkeys.</p>}
         {done && <p className="text-sm text-muted-foreground" role="status">Saved.</p>}
         <div>
@@ -332,7 +332,7 @@ function Password({ account, actions }: { account: AccountData; actions?: Accoun
   }
 
   return (
-    <form className="flex flex-col gap-4 border-t pt-5" onSubmit={save} noValidate>
+    <form className="flex flex-col gap-4 border-t pt-4" onSubmit={save} noValidate>
       {account.password && (
         <Field>
           <FieldLabel htmlFor="current-password">Current password</FieldLabel>
@@ -373,7 +373,7 @@ function Invite({ account, actions }: { account: AccountData; actions?: AccountA
   };
 
   return (
-    <section aria-labelledby="invite-heading" className="flex flex-col gap-5 rounded-xl border bg-card p-6 sm:p-8">
+    <section aria-labelledby="invite-heading" className="flex flex-col gap-4 rounded-xl border bg-card px-6 py-5 sm:px-8 sm:py-6">
       <div className="flex flex-col gap-1">
         <h2 id="invite-heading" className="text-lg font-semibold tracking-tight">Invite someone</h2>
         <p className="text-[15px] text-muted-foreground">
@@ -401,7 +401,7 @@ function Invite({ account, actions }: { account: AccountData; actions?: AccountA
         {message && <FieldError>{message}</FieldError>}
         <div>
           <Button type="submit" variant="outline" size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy}>
-            {email.trim() ? 'Send invite' : invite ? 'Make another link' : 'Make an invite link'}
+            {email.trim() ? 'Send invite' : invite ? 'Create another link' : 'Create invite link'}
           </Button>
         </div>
       </form>

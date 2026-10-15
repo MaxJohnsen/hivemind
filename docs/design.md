@@ -7,11 +7,20 @@ How Homing's screens look and behave. People work with Homing through their assi
 - Every element says something. If it doesn't, it goes.
 - One job per page, with one obvious main action.
 - Never more than needed, always enough to finish.
+- The essentials come first, and details are there on request, but an important consequence is never hidden.
 - A decision shows the exact change word for word, set apart from the rest, with who wants it and where it applies.
-- Everyday words: "Claude wants to use Homing as you", never OAuth, scope or client.
 - Anything that shares or removes says what will happen before you confirm.
 - It works on a phone, with a keyboard and with a screen reader, to WCAG 2.2 AA.
 - Quietly polished. The interface does the work, and illustrations give it character.
+
+## Voice
+
+Words on screens follow the repository's writing rules in [AGENTS.md](../AGENTS.md). They are also confident and considerate: not cute, and not technical unless they have to be.
+
+- Explain what people can do, what will happen, and what matters to their decision. Leave out the machinery behind it.
+- Everyday words: "Connect Claude to Homing?", never OAuth, scope or client.
+- Say whether something is proposed, waiting for approval, or done.
+- Answer the worry someone actually has, as "Being invited gives them no access to your spaces" does.
 
 ## Tagline
 
@@ -67,7 +76,8 @@ Figtree is the only typeface, and it ships with the app. Page titles are 24 px, 
 - Joining has the same layout, with the welcome drawing. The setup link creates the first account, and an invite everyone else's: it says who sent it, starts with the address it was sent to, and offers a password instead of a passkey. A link that no longer works says what to do instead.
 - "Can't sign in?" leads to a page that sends a sign-in link to a verified email, or, without email, says to ask whoever runs Homing. It reads the same whether or not the account exists.
 - The account page is one centered column, like decision pages. Connected assistants come first, with the address for connecting another, then how you sign in, then, for the instance admin, inviting someone. Disconnecting an assistant and removing a passkey ask first, in place, and the last way to sign in can't be removed.
-- Allowing an assistant is a decision page: "Claude wants to use Homing as you", the site it says it comes from, what it can and can't do, and Allow or Don't allow.
+- Connecting an assistant is a decision page: "Connect Claude to Homing?", the site it says it comes from, what it can read and save, that changing rules or sharing knowledge needs your approval, and Connect Claude or Cancel.
+- Inviting people is on the account page for now. It belongs in an administration area once there is one.
 - Sign-in with Google or Microsoft uses the providers' own marks, as their guidelines ask.
 - Decision pages are one centered column with a single heading that says who wants what, where.
 
