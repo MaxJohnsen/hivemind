@@ -11,6 +11,7 @@ Homing is being designed and built in the open. The documents describe it, and e
 - `docs/spec.md` defines the behavior and guarantees, without technology.
 - `docs/architecture.md` describes how Homing is built.
 - `docs/design.md` describes how its screens look and behave.
+- `docs/deployment.md` explains how to run Homing: settings, HTTPS, updates and recovery.
 
 Keep that separation. Implementation details never go in the concept or the spec.
 

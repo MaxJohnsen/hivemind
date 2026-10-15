@@ -46,6 +46,7 @@ Homing is being designed and built in the open. The concept and the specificatio
 - [Specification](docs/spec.md): the guarantees and the detailed behavior.
 - [Architecture](docs/architecture.md): how it is built.
 - [Design](docs/design.md): how its screens look and behave.
+- [Running Homing](docs/deployment.md): how to run your own.
 - [Prior art](docs/prior-art.md): what already exists, and what we learned from it.
 
 ## License

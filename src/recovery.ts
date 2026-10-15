@@ -31,7 +31,7 @@ export function operatorLinks() {
   };
 }
 
-/** A one-time sign-in link for the account with this email, working for an hour, if there is one. */
+/** A one-time sign-in link for the account with this email, working for 15 minutes, if there is one. */
 export async function operatorSignInLink(auth: Auth, url: URL, email: string): Promise<string | undefined> {
   const { internalAdapter } = await auth.$context;
   const found = await internalAdapter.findUserByEmail(email.trim().toLowerCase());
@@ -40,7 +40,7 @@ export async function operatorSignInLink(auth: Auth, url: URL, email: string): P
   await internalAdapter.createVerificationValue({
     identifier: linkKey(token),
     value: found.user.id,
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000),
   });
   return new URL(`/api/auth/sign-in/operator-link?token=${token}`, url).toString();
 }

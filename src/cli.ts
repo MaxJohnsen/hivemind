@@ -2,13 +2,14 @@
 // can, and gives people a sign-in link when they can't sign in. Everything
 // here is a person editing directly.
 
+import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import { authDatabaseUrl, connect, withPrincipal } from './db.ts';
 import { addRule, editRule, removeRule, rulesFor, type Rule, type RuleKind } from './guidance.ts';
 import { readSkillFolder, removeSkill, saveSkill, skillsFor } from './skills.ts';
 import { createAuth } from './auth.ts';
 import { operatorSignInLink } from './recovery.ts';
-import { configuredUrl, secretFor } from './server.ts';
+import { configuredUrl } from './server.ts';
 import { addMember, createSpace, listSpaces, type Space } from './spaces.ts';
 
 const usage = `Usage: node src/cli.ts <command>
@@ -55,9 +56,11 @@ try {
     const url = configuredUrl ?? new URL('http://localhost:4100');
     const pool = new Pool({ connectionString: authDatabaseUrl, options: '-c search_path=auth' });
     try {
-      const auth = createAuth(sql, pool, { url, secret: secretFor(url), passwords: false, assistantSites: [] });
+      // Making a sign-in link signs nothing, so the command line needs no secret of the server's.
+      const secret = randomBytes(32).toString('base64url');
+      const auth = createAuth(sql, pool, { url, secret, passwords: false, rateLimit: false, assistantSites: [] });
       const link = await operatorSignInLink(auth, url, args[0]);
-      console.log(link ? `Send this to them. It signs them in once, within an hour:\n\n  ${link}` : 'There is no account with that email.');
+      console.log(link ? `Send this to them. It signs them in once, within 15 minutes:\n\n  ${link}` : 'There is no account with that email.');
     } finally {
       await pool.end();
     }

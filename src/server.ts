@@ -147,7 +147,7 @@ function secretFor(url: URL | undefined, host: string | undefined): string {
   if (!secret && (!url || isLocal(url)) && ['127.0.0.1', 'localhost', '::1'].includes(host ?? '')) return developmentSecret;
   throw new Error(
     'Homing needs a secret of its own to sign people in. Set HOMING_SECRET to at least 32 random characters, ' +
-      'such as the output of `openssl rand -base64 32`, and keep it: changing it signs everyone out and disconnects their assistants.',
+      'such as the output of `openssl rand -base64 32`, and keep it. See docs/deployment.md.',
   );
 }
 

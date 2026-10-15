@@ -84,7 +84,7 @@ export function Account({ account, notice, actions }: { account: AccountData; no
 
         {notice === 'recovered' ? (
           <>
-            <SignInMethods account={account} actions={actions} />
+            <SignInMethods account={account} actions={actions} restoring />
             <Assistants account={account} actions={actions} />
           </>
         ) : (
@@ -198,7 +198,8 @@ function siteOf(clientId: string): string {
   }
 }
 
-function SignInMethods({ account, actions }: { account: AccountData; actions?: AccountActions }) {
+/** How you sign in. After a sign-in link, adding a passkey is the one thing to do, so it leads. */
+function SignInMethods({ account, actions, restoring }: { account: AccountData; actions?: AccountActions; restoring?: boolean }) {
   const [message, setMessage] = useState<string>();
   const [staleSession, setStaleSession] = useState(false);
   const [removing, setRemoving] = useState<string>();
@@ -254,7 +255,7 @@ function SignInMethods({ account, actions }: { account: AccountData; actions?: A
 
       <div className="flex flex-col gap-3">
         <div>
-          <Button variant="outline" size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy} onClick={() => actions && run(actions.addPasskey)}>
+          <Button variant={restoring ? 'default' : 'outline'} size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy} onClick={() => actions && run(actions.addPasskey)}>
             <KeyRound data-icon="inline-start" />Add a passkey
           </Button>
         </div>

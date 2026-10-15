@@ -16,28 +16,12 @@ npm run dev:web           # the screens, with sample data, at http://localhost:5
 
 ### Running it
 
+[Running Homing](docs/deployment.md) explains settings, HTTPS and updates. For a local try:
+
 ```sh
 echo "HOMING_SECRET=$(openssl rand -base64 32)" >> .env   # once
 docker compose up -d --build
 docker compose logs homing   # shows the link for creating the first account
-```
-
-Open the link to create your account with a passkey. It works once, for an hour; restart Homing for a new one. Homing reads these settings:
-
-| Setting | What it does |
-|---|---|
-| `HOMING_URL` | Where people and assistants reach Homing, such as `https://homing.example.com`. Passkeys belong to its host name. Defaults to `http://localhost:4100` |
-| `HOMING_SECRET` | Signs sessions: at least 32 random characters, such as from `openssl rand -base64 32`. Homing won't start without one, except when it listens only on localhost, as `npm test` does. Changing it signs everyone out |
-| `HOMING_PASSWORDS` | `off` turns off signing in with a password. Passkeys always work |
-| `HOMING_TRUSTED_PROXIES` | The reverse proxies in front of Homing, as addresses or ranges like `172.16.0.0/12`. Only their `X-Forwarded-For` counts for sign-in's rate limits; otherwise Homing uses the connection's own address |
-| `HOMING_ASSISTANT_SITES` | The sites whose assistants may connect, by the host of their client metadata document. Defaults to `claude.ai,chatgpt.com`; `*` allows any |
-| `SMTP_URL` | Optional, for sending email, such as `smtps://user:password@smtp.example.com`. Without it, Homing never sends email |
-| `HOMING_EMAIL_FROM` | Who Homing's email comes from, such as `Homing <homing@example.com>` |
-
-Your account page invites people. If someone can't sign in and Homing has no email, give them a one-time sign-in link:
-
-```sh
-docker compose exec homing node src/cli.ts sign-in-link ana@example.com
 ```
 
 ### Trying it with Claude Code
@@ -53,7 +37,7 @@ claude mcp add --transport http homing http://localhost:4100/mcp
 
 The first time Claude Code connects, it opens Homing in your browser: sign in and allow it. Then ask Claude Code to remember something for that client, and ask about it in a new session. Ask it to write a report for the client, and the rule comes with the context. Your account page lists Claude Code, and disconnecting it there stops it at once.
 
-The command line acts as whoever you name, without sign-in, so treat it like the database password. An agent that can run commands on the same machine, such as Claude Code, can use it too, and can change guidance with it. Until Homing has sign-in, don't rely on "only people change guidance" there.
+The command line acts as whoever you name, without sign-in, so treat it like the database password. An agent that can run commands on the same machine, such as Claude Code, can use it too, and can change guidance with it, so don't rely on "only people change guidance" there.
 
 To add a skill, run the command line from your checkout instead, so it can read the skill's folder on your computer. It connects to the database from Docker Compose.
 

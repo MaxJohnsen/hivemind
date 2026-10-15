@@ -36,7 +36,7 @@ services:
       AUTH_DATABASE_URL: postgres://homing_auth:homing_auth@db:5432/homing
       # Where people and assistants reach Homing. Anything but localhost needs a secret too.
       HOMING_URL: ${HOMING_URL:-}
-      # Required: Homing won't start without it. See CONTRIBUTING.
+      # Required: Homing won't start without it. See docs/deployment.md.
       HOMING_SECRET: ${HOMING_SECRET:-}
       HOMING_TRUSTED_PROXIES: ${HOMING_TRUSTED_PROXIES:-}
       HOMING_ASSISTANT_SITES: ${HOMING_ASSISTANT_SITES:-}
