@@ -28,6 +28,7 @@ This repository should read as if people wrote it for people.
 - Say what Homing is designed to do. Don't claim it works before it is built.
 - Present conclusions, not the discussion that led to them.
 - Link any claim about another project to its source.
+- Words on screens follow these rules too, with the voice in `docs/design.md`.
 
 ## How we build
 

@@ -48,7 +48,7 @@ export function Connect({
 
           <div className="flex flex-col gap-3 rounded-lg bg-change p-5 text-[15px]">
             <p>{assistant.name} can read the knowledge you have access to, and save what it learns privately.</p>
-            <p>It can't change your rules or share knowledge through Homing.</p>
+            <p>Changing rules or sharing knowledge requires your approval.</p>
           </div>
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
