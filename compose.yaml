@@ -3,6 +3,7 @@ name: homing
 services:
   db:
     image: postgres:18-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: homing
       POSTGRES_PASSWORD: homing
@@ -31,6 +32,7 @@ services:
   # Prints a link for creating the first account when it starts.
   homing:
     build: .
+    restart: unless-stopped
     environment:
       DATABASE_URL: postgres://homing_app:homing_app@db:5432/homing
       AUTH_DATABASE_URL: postgres://homing_auth:homing_auth@db:5432/homing
