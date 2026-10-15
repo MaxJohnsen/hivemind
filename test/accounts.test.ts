@@ -272,6 +272,56 @@ describe('invites', () => {
   });
 });
 
+describe('a server others can reach', () => {
+  const authDatabase = inTestDatabase(authDatabaseUrl);
+
+  test('needs a secret of its own', async () => {
+    // Listening beyond this machine, or reached at a public address, the development secret won't do.
+    for (const options of [{ host: '0.0.0.0' }, { host: '127.0.0.1', url: new URL('https://homing.example.com') }]) {
+      const started = await startServer(db, { port: 0, authDatabase, ...options }).catch((error: Error) => error);
+      if (!(started instanceof Error)) {
+        await started.close();
+        assert.fail(`started without a secret: ${JSON.stringify(options)}`);
+      }
+      assert.match(started.message, /HOMING_SECRET/);
+    }
+  });
+
+  test('limits sign-in attempts per client, whatever address the client claims', async () => {
+    const attempts = async (homing: Homing) => {
+      const statuses = [];
+      for (let i = 1; i <= 5; i++) {
+        const response = await fetch(new URL('/api/auth/sign-in/email', homing.url), {
+          method: 'POST',
+          headers: {
+            origin: homing.url.origin,
+            'content-type': 'application/json',
+            'x-forwarded-for': `203.0.113.${i}`,
+            'x-homing-client-address': `198.51.100.${i}`,
+          },
+          body: JSON.stringify({ email: `nobody-${tag()}@acme.test`, password: 'not the password' }),
+        });
+        statuses.push(response.status);
+      }
+      return statuses;
+    };
+
+    const direct = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase, rateLimit: true });
+    try {
+      assert.ok((await attempts(direct)).includes(429));
+    } finally {
+      await direct.close();
+    }
+    // Behind a proxy Homing trusts, the address it forwarded for counts instead.
+    const proxied = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase, rateLimit: true, trustedProxies: '127.0.0.1, ::1' });
+    try {
+      assert.ok(!(await attempts(proxied)).includes(429));
+    } finally {
+      await proxied.close();
+    }
+  });
+});
+
 test('the instance admin sees nothing of other people’s spaces', async () => {
   const ana = await person('Ana');
   await admin`update people set instance_admin = true where id = ${ana.id}`;

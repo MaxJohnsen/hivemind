@@ -1,10 +1,10 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import { BlockList, isIP, type AddressInfo } from 'node:net';
 import { hostHeaderValidation, toNodeHandler } from '@modelcontextprotocol/node';
 import { createMcpHandler, localhostAllowedHostnames, type AuthInfo } from '@modelcontextprotocol/server';
 import { toNodeHandler as authHandler } from 'better-auth/node';
 import { Pool } from 'pg';
-import { authEndpoints, createAuth, type Auth } from './auth.ts';
+import { authEndpoints, clientAddressHeader, createAuth, type Auth } from './auth.ts';
 import { authDatabaseUrl, connect, type Sql } from './db.ts';
 import { setupLink } from './invites.ts';
 import { mcpServer } from './mcp.ts';
@@ -16,10 +16,14 @@ export interface ServerOptions {
   host?: string;
   /** Where Homing is reached. By default HOMING_URL, or localhost at the port it listens on. */
   url?: URL;
-  /** Signs sessions. By default HOMING_SECRET, which only a local install may leave out. */
+  /** Signs sessions. By default HOMING_SECRET, which only a server reachable from this machine alone may leave out. */
   secret?: string;
   /** Sign-in's own database connection, as homing_auth. */
   authDatabase?: string;
+  /** Proxies whose X-Forwarded-For Homing believes, as addresses or ranges. By default HOMING_TRUSTED_PROXIES. */
+  trustedProxies?: string;
+  /** Whether sign-in limits how often each client tries. By default on, except for a local install. */
+  rateLimit?: boolean;
 }
 
 export interface Homing {
@@ -31,6 +35,9 @@ export interface Homing {
 
 /** Serves the web app, sign-in, and MCP at /mcp. */
 export async function startServer(sql: Sql, options: ServerOptions): Promise<Homing> {
+  const configured = options.url ?? configuredUrl;
+  const secret = options.secret ?? secretFor(configured, options.host);
+  const proxies = trustedProxies(options.trustedProxies ?? process.env.HOMING_TRUSTED_PROXIES);
   let app: App | undefined;
   let mcp: ReturnType<typeof toNodeHandler>;
   let auth: ReturnType<typeof authHandler>;
@@ -43,6 +50,8 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
         return;
       }
       if (!validateHost(req, res)) return;
+      // Sign-in's rate limits go by this address, never by one the client claims.
+      req.headers[clientAddressHeader] = clientAddress(req, proxies);
       const path = new URL(req.url ?? '/', app.url).pathname;
       if (path === '/mcp') {
         const token = /^Bearer (\S+)$/i.exec(req.headers.authorization ?? '')?.[1];
@@ -68,10 +77,14 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
   });
 
   await new Promise<void>((resolve) => server.listen(options.port, options.host, resolve));
-  const url = options.url ?? configuredUrl ?? new URL(`http://localhost:${(server.address() as AddressInfo).port}`);
-  const secret = options.secret ?? secretFor(url);
+  const url = configured ?? new URL(`http://localhost:${(server.address() as AddressInfo).port}`);
   const pool = new Pool({ connectionString: options.authDatabase ?? authDatabaseUrl, options: '-c search_path=auth' });
-  const homingAuth = createAuth(sql, pool, { url, secret, passwords: process.env.HOMING_PASSWORDS !== 'off' });
+  const homingAuth = createAuth(sql, pool, {
+    url,
+    secret,
+    passwords: process.env.HOMING_PASSWORDS !== 'off',
+    rateLimit: options.rateLimit ?? !isLocal(url),
+  });
 
   mcp = toNodeHandler(createMcpHandler(({ authInfo }) => mcpServer(sql, authInfo?.extra?.principal as AgentPrincipal)));
   auth = authHandler(homingAuth);
@@ -98,14 +111,44 @@ function isLocal(url: URL): boolean {
   return ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
 }
 
-// Anyone could sign sessions with this one, so only a local install may use it.
+// Anyone could sign sessions with this one, so only a server that is reached
+// at localhost and listens there alone may use it, as when developing Homing.
 const developmentSecret = 'homing-development-secret-for-localhost-only';
 
-function secretFor(url: URL): string {
+function secretFor(url: URL | undefined, host: string | undefined): string {
   const secret = process.env.HOMING_SECRET;
   if (secret && secret.length >= 32) return secret;
-  if (!secret && isLocal(url)) return developmentSecret;
-  throw new Error('Set HOMING_SECRET to at least 32 random characters, such as the output of `openssl rand -base64 32`.');
+  if (!secret && (!url || isLocal(url)) && ['127.0.0.1', 'localhost', '::1'].includes(host ?? '')) return developmentSecret;
+  throw new Error(
+    'Homing needs a secret of its own to sign people in. Set HOMING_SECRET to at least 32 random characters, ' +
+      'such as the output of `openssl rand -base64 32`, and keep it: changing it signs everyone out and disconnects their assistants.',
+  );
+}
+
+/** The proxies whose X-Forwarded-For Homing believes, from addresses and ranges like `10.0.0.0/8`. */
+function trustedProxies(list = ''): BlockList {
+  const trusted = new BlockList();
+  for (const entry of list.split(',').map((item) => item.trim()).filter(Boolean)) {
+    const [address, prefix] = entry.split('/');
+    const version = isIP(address);
+    if (!version) throw new Error(`HOMING_TRUSTED_PROXIES has ${entry}, which isn't an IP address or range.`);
+    if (prefix) trusted.addSubnet(address, Number(prefix), version === 6 ? 'ipv6' : 'ipv4');
+    else trusted.addAddress(address, version === 6 ? 'ipv6' : 'ipv4');
+  }
+  return trusted;
+}
+
+/**
+ * Who a request comes from: the address of the connection, or, when that is
+ * a proxy Homing trusts, the address the proxy says it forwarded for.
+ */
+function clientAddress(req: IncomingMessage, trusted: BlockList): string {
+  const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',').map((item) => item.trim()).filter(Boolean);
+  const plain = (address?: string) => address?.replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  const isTrusted = (address: string) => isIP(address) > 0 && trusted.check(address, isIP(address) === 6 ? 'ipv6' : 'ipv4');
+  let address = plain(req.socket.remoteAddress);
+  while (address && isTrusted(address) && forwarded.length) address = plain(forwarded.pop());
+  return address && isIP(address) ? address : '';
 }
 
 // Migrations run as a separate step before this, so the server never holds the admin role.

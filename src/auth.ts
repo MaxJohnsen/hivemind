@@ -13,7 +13,12 @@ export interface AuthSettings {
   secret: string;
   /** Whether people may also sign in with a password. */
   passwords: boolean;
+  /** Whether sign-in limits how often each client tries, by the address the server gives it. */
+  rateLimit: boolean;
 }
+
+/** Where the server puts the address a request comes from, for sign-in's rate limits. */
+export const clientAddressHeader = 'x-homing-client-address';
 
 /**
  * Sign-in and sessions, through Better Auth. It connects as homing_auth and
@@ -21,8 +26,6 @@ export interface AuthSettings {
  * created only by accepting an invite, with a passkey, and gets its person's id.
  */
 export function createAuth(sql: Sql, pool: Pool, settings: AuthSettings) {
-  const local = ['localhost', '127.0.0.1', '[::1]'].includes(settings.url.hostname);
-
   return betterAuth({
     appName: 'Homing',
     baseURL: settings.url.origin,
@@ -33,9 +36,13 @@ export function createAuth(sql: Sql, pool: Pool, settings: AuthSettings) {
     emailAndPassword: { enabled: settings.passwords, disableSignUp: true },
     // Accounts are never linked because an email address matches.
     account: { accountLinking: { enabled: false } },
-    // Limits are kept per client address, which only a real deployment has.
-    rateLimit: { enabled: !local },
-    advanced: { cookiePrefix: 'homing', database: { generateId: 'uuid' } },
+    rateLimit: { enabled: settings.rateLimit },
+    advanced: {
+      cookiePrefix: 'homing',
+      database: { generateId: 'uuid' },
+      // Only the server's own answer to who a request comes from, never a header the client sent.
+      ipAddress: { ipAddressHeaders: [clientAddressHeader] },
+    },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === '/passkey/generate-register-options') {
