@@ -1,0 +1,56 @@
+/* The landing page. Its type has five steps, larger than the app's because it introduces Homing
+   rather than asking for a decision. The product fragments on it keep the app's own scale. */
+.landing {
+  --t-display: clamp(2.125rem, 0.6rem + 5.6vw, 6rem);
+  --t-heading: clamp(2rem, 1.2rem + 2.4vw, 3.25rem);
+  --t-lead: clamp(1.375rem, 0.95rem + 1.2vw, 2.125rem);
+  --t-body: 1.125rem;
+  --t-small: 0.9375rem;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.landing .t-display { font-size: var(--t-display); line-height: 1; letter-spacing: -0.035em; }
+.landing .t-heading { font-size: var(--t-heading); line-height: 1.05; letter-spacing: -0.025em; }
+.landing .t-lead { font-size: var(--t-lead); line-height: 1.25; letter-spacing: -0.01em; }
+.landing .t-body { font-size: var(--t-body); line-height: 1.55; }
+.landing .t-small { font-size: var(--t-small); line-height: 1.5; }
+
+/* On linen, the white paper of the character sheet disappears into the page. */
+.landing .on-paper { mix-blend-mode: multiply; }
+
+/* Buttons and links answer a press. */
+.landing .press { transition: transform 160ms var(--ease-out), background-color 200ms ease, color 200ms ease, border-color 200ms ease; }
+.landing .press:active { transform: scale(0.97); }
+.landing .link { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 0.22em; text-decoration-thickness: 0.07em; transition: text-decoration-color 200ms ease, color 200ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .landing .link:hover { text-decoration-color: currentColor; }
+}
+
+/* The question being answered, and the cards the answer came from. */
+.landing .kept { transition: background-color 300ms ease, box-shadow 300ms ease, border-color 300ms ease; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The masthead opens from the bottom edge while the drawing settles. */
+  .landing.moving .shutter { clip-path: inset(100% 0 0 0 round 1.75rem); transition: clip-path 1100ms var(--ease-in-out); }
+  .landing.moving .shutter img { transform: scale(1.12); transition: transform 1500ms var(--ease-out); }
+  .landing.moving .shutter.is-in { clip-path: inset(0 0 0 0 round 1.75rem); }
+  .landing.moving .shutter.is-in img { transform: none; }
+
+  /* The parts of each section rise in turn as it comes into view. */
+  .landing.moving [data-reveal] {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 700ms var(--ease-out), transform 900ms var(--ease-out);
+    transition-delay: calc(var(--i, 0) * 80ms);
+  }
+  .landing.moving [data-reveal].is-in { opacity: 1; transform: none; }
+
+  /* A new answer arrives. */
+  .landing .arrive { animation: arrive 500ms var(--ease-out); }
+  @keyframes arrive {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+}
