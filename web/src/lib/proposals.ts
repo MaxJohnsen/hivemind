@@ -26,12 +26,11 @@ export function placeOf(proposal: Pick<ProposalData, 'space' | 'personal'>): str
   return proposal.personal ? 'your personal space' : proposal.space;
 }
 
-/** How a new rule sits among the ones that already apply. */
-export function precedenceOf(proposal: Pick<ProposalData, 'kind' | 'personal'>): string {
-  if (proposal.kind === 'requirement') return 'Requirements always apply. If two requirements conflict, the assistant stops and tells you.';
-  return proposal.personal
-    ? 'A preference set in a space wins over it there, and requirements always apply.'
-    : 'It wins over preferences from the spaces above and from your personal space, but never over a requirement.';
+/** What happens when a new rule disagrees with one that already applies. */
+export function precedenceOf(proposal: Pick<ProposalData, 'kind'>): string {
+  return proposal.kind === 'requirement'
+    ? 'If it disagrees with another requirement, your assistant stops and tells you.'
+    : 'If it disagrees with a requirement, the requirement wins.';
 }
 
 /** Whether a change or removal lost its rule before anyone decided. */

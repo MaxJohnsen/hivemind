@@ -59,14 +59,14 @@ export function Confirm({ proposal, person, decide, message: initialMessage }: {
                 </Button>
               </div>
               {message && <FieldError>{message}</FieldError>}
-              <p className="text-xs text-muted-foreground">Only you can approve this. {assistant} can’t do it for you.</p>
+              <p className="text-sm text-muted-foreground">Only you can approve this. {assistant} can’t do it for you.</p>
             </>
           ) : (
             <div className="flex flex-col gap-5" role="status">
               <div className="flex items-start gap-3">
                 <OutcomeIcon kind={outcome.kind} className="mt-0.5 size-6" />
                 <div className="flex flex-col gap-1">
-                  <h1 className="text-xl font-semibold tracking-tight">{outcome.heading}</h1>
+                  <h1 className="text-2xl font-semibold tracking-tight">{outcome.heading}</h1>
                   <p className="text-sm text-muted-foreground">
                     {outcome.detail}
                     {outcome.kind !== 'expired' && ' You can close this page.'}

@@ -74,7 +74,7 @@ export function Account({ account, notice, actions }: { account: AccountData; no
           <div className="flex items-start gap-3 rounded-xl bg-change p-5" role="status">
             <CircleCheck aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-primary" />
             <div className="flex flex-col gap-1">
-              <h1 className="text-xl font-semibold tracking-tight">{shown.title}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">{shown.title}</h1>
               <p className="text-[15px] text-muted-foreground">{shown.text}</p>
             </div>
           </div>
