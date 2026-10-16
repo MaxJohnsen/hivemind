@@ -37,7 +37,14 @@ export default defineConfig(({ mode }) => {
     root,
     plugins: [react(), tailwindcss(), ...(card ? [singleFile()] : [])],
     resolve: { alias: { '@': resolve(root, 'src') } },
-    build: card
+    // homing.place, the landing page, is a static site of its own and never part of Homing.
+    build: mode === 'site'
+      ? {
+          outDir: resolve(root, 'dist/site'),
+          emptyOutDir: true,
+          rollupOptions: { input: resolve(root, 'site.html') },
+        }
+      : card
       ? {
           outDir: resolve(root, 'dist/card'),
           emptyOutDir: true,

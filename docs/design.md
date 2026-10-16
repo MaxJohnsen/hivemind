@@ -110,6 +110,14 @@ Inside an assistant the approval card takes the host's colors, font and corners,
 - The assistant can draw the card again later, so it always shows how things stand now, and a decided change stays greyed with its outcome.
 - Only assistants checked to keep the model from pressing its buttons show it, Claude first. The others give the person a link to the decision page.
 
+## The landing page
+
+homing.place introduces Homing to someone meeting it for the first time. It is a site of its own, never part of Homing, so a self-hosted Homing doesn't carry it.
+
+- It aligns to two lines: the page margin, and an axis at five twelfths of the width. Reading text starts on the axis, drawings and short notes sit to its left, and wide things run from margin to margin. The headline is the one exception, from the margin. On a phone the axis is the margin.
+- Because it introduces rather than asks for a decision, its type is larger: the headline, section headings, one larger line at 24 px, body text at 18 px and small notes at 15 px. Product fragments on it keep the app's own scale.
+- Drawings appear here as on welcome pages, with the bird carrying the page from the first screen to its box at the end.
+
 ## Working on screens
 
-`npm run dev:web` serves every screen with sample data, and its start page lists them, each state at its own address. The real pages come from Homing itself: run `npm run build:web`, then start the server.
+`npm run dev:web` serves every screen with sample data, and its start page lists them, each state at its own address. The real pages come from Homing itself: run `npm run build:web`, then start the server. The landing page is `/landing` there, and `npm run build:site` builds homing.place as static files.
