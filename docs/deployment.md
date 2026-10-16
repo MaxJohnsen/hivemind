@@ -16,6 +16,8 @@ The log shows a link for creating the first account. It works once, for an hour;
 
 Keep the secret. It signs sessions and protects the keys that sign assistants' tokens, so changing it signs everyone out and stops assistants from getting new tokens.
 
+The log also shows what assistants ask Homing for, such as `mcp: Claude tools/call act`, but never what they send.
+
 ## HTTPS
 
 Claude.ai and ChatGPT reach Homing at a public HTTPS address, and passkeys need HTTPS everywhere but localhost. Put Homing behind a reverse proxy that handles HTTPS, such as Caddy, and set `HOMING_URL` to the address people use. Compose publishes Homing only on this machine, at `127.0.0.1:4100`, for the proxy to forward to.

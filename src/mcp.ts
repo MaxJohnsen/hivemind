@@ -538,7 +538,7 @@ async function proposeGuidance(
     onlyHere?: boolean;
   },
   card: boolean,
-): Promise<Answer> {
+): Promise<string | Answer> {
   const spaceId = parseRef(input.space, 'space');
   let proposal: Proposal;
   if (input.change === 'add') {
@@ -558,12 +558,12 @@ async function proposeGuidance(
     ? 'Homing shows them the exact change in a card here, to approve or reject. ' +
       `If they can't see the card, give them this link instead: ${links.proposal(proposal.id)}`
     : `Give them this link to approve or reject it in Homing: ${links.proposal(proposal.id)}`;
-  return {
-    text:
-      `Waiting for the user's approval (${ref('proposal', proposal.id)}). Nothing has changed yet. ${where}\n\n` +
-      'Only they can decide it, so never say it is approved until `read` shows it is. Once it is, call `context` again for the rules as they are.',
-    structuredContent: { proposal: proposal.id },
-  };
+  const text =
+    `Waiting for the user's approval (${ref('proposal', proposal.id)}). Nothing has changed yet. ${where}\n\n` +
+    'Only they can decide it, so never say it is approved until `read` shows it is. Once it is, call `context` again for the rules as they are.';
+  // The card finds its proposal in the structured part. Some assistants show
+  // the model only that part, so it carries what the model needs too.
+  return card ? { text, structuredContent: { proposal: proposal.id, link: links.proposal(proposal.id), note: text } } : text;
 }
 
 /** "Add a preference: "Write reports in Norwegian"", for an agent. */

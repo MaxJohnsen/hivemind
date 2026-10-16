@@ -5,7 +5,7 @@
 // rules as they were.
 
 import assert from 'node:assert/strict';
-import { after, before, test } from 'node:test';
+import { after, before, mock, test } from 'node:test';
 import { authDatabaseUrl } from '../src/db.ts';
 import { addRule, editRule, rulesFor } from '../src/guidance.ts';
 import { startServer, type Homing } from '../src/server.ts';
@@ -338,4 +338,23 @@ test('only assistants checked to keep the model off the card get it', async () =
   await assert.rejects(throughTheCard(chatgpt, 'decide', { proposal: id, approve: true }), /Tool decide not found/);
   await assert.rejects(chatgpt.client.readResource({ uri: 'ui://homing/approval.html' }));
   assert.deepEqual(await rules(ana, space), []);
+});
+
+test('the log says what assistants asked for, never what they wrote', async () => {
+  const logged = await startServer(db, { port: 0, host: '127.0.0.1', authDatabase: inTestDatabase(authDatabaseUrl), ...testAssistants, logRequests: true });
+  try {
+    const ana = await member(logged.url, 'Ana');
+    const claude = new Assistant(logged.url);
+    await claude.connect(ana.browser);
+    const lines = mock.method(console, 'log', () => {});
+    const conversation = await claude.open();
+    await conversation.call('act', { action: 'guidance.propose', input: { space: `space:${ana.personalSpaceId}`, change: 'add', kind: 'preference', text: 'Ana’s secret rule' } });
+    await conversation.close();
+    const log = lines.mock.calls.map((call) => String(call.arguments[0]));
+    lines.mock.restore();
+    assert.ok(log.includes('mcp: Claude tools/call act'), log.join('\n'));
+    assert.ok(log.every((line) => !line.includes('secret')));
+  } finally {
+    await logged.close();
+  }
 });

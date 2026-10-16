@@ -35,6 +35,8 @@ export interface ServerOptions {
   mailer?: Mailer;
   /** Whether people may sign in with a password. On unless HOMING_PASSWORDS is off. */
   passwords?: boolean;
+  /** Whether to log what assistants ask for. On by default. */
+  logRequests?: boolean;
 }
 
 export interface Homing {
@@ -112,12 +114,16 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
   verifyToken = tokenVerifier(homingAuth, pool, url);
 
   const cards = new Set(options.cardClients ?? cardClients);
-  mcp = toNodeHandler(
-    createMcpHandler(({ authInfo }) => {
-      const principal = authInfo?.extra?.principal as AgentPrincipal;
-      return mcpServer(sql, principal, url, { card: cards.has(principal.clientId) });
-    }),
-  );
+  const handler = createMcpHandler(({ authInfo }) => {
+    const principal = authInfo?.extra?.principal as AgentPrincipal;
+    return mcpServer(sql, principal, url, { card: cards.has(principal.clientId) });
+  });
+  mcp = toNodeHandler({
+    fetch: async (request, context) => {
+      if (options.logRequests ?? true) logRequest(await request.clone().text(), (context?.authInfo?.extra?.principal as AgentPrincipal).agent);
+      return handler.fetch(request, context);
+    },
+  });
   auth = authHandler(homingAuth);
   // Refuses requests addressed to other host names, which protects a local install from DNS rebinding.
   validateHost = hostHeaderValidation(isLocal(url) ? localhostAllowedHostnames() : [url.hostname]);
@@ -144,6 +150,23 @@ const assistantSites = (process.env.HOMING_ASSISTANT_SITES || 'claude.ai,chatgpt
  * buttons. Every other assistant gives the person a link instead.
  */
 const cardClients = ['https://claude.ai/oauth/mcp-oauth-client-metadata'];
+
+/**
+ * Logs what an assistant asked for, such as `Claude tools/call act`: the
+ * method and the tool or resource, never the arguments or anything else a
+ * person wrote.
+ */
+function logRequest(body: string, assistant: string) {
+  let message: { method?: unknown; params?: { name?: unknown; uri?: unknown } } | undefined;
+  try {
+    message = JSON.parse(body);
+  } catch {
+    return;
+  }
+  if (typeof message?.method !== 'string' || message.method.startsWith('notifications/')) return;
+  const what = [message.params?.name, message.params?.uri].find((value) => typeof value === 'string');
+  console.log(`mcp: ${assistant} ${message.method}${what ? ` ${what}` : ''}`);
+}
 
 /** Where Homing is reached, which decides the host names it answers to. */
 export const configuredUrl = process.env.HOMING_URL ? new URL(process.env.HOMING_URL) : undefined;
