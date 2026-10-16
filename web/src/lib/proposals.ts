@@ -33,3 +33,40 @@ export function precedenceOf(proposal: Pick<ProposalData, 'kind' | 'personal'>):
     ? 'A preference set in a space wins over it there, and requirements always apply.'
     : 'It wins over preferences from the spaces above and from your personal space, but never over a requirement.';
 }
+
+/** Whether a change or removal lost its rule before anyone decided. */
+export function isGone(proposal: Pick<ProposalData, 'action' | 'rule'>): boolean {
+  return proposal.action !== 'add' && !proposal.rule?.current;
+}
+
+/** The buttons for deciding it. */
+export function buttonsOf(action: ProposalData['action']): { approve: string; reject: string } {
+  return action === 'add'
+    ? { approve: 'Add rule', reject: 'Don’t add' }
+    : action === 'change'
+      ? { approve: 'Change rule', reject: 'Don’t change' }
+      : { approve: 'Remove rule', reject: 'Keep it' };
+}
+
+/** What happened, once it is decided, expired, or no longer possible. Undefined while it waits. */
+export function outcomeOf(proposal: ProposalData): { kind: 'approved' | 'rejected' | 'expired' | 'gone'; heading: string; detail: string } | undefined {
+  const { action, assistant, state } = proposal;
+  const place = placeOf(proposal);
+  if (state === 'approved') {
+    return {
+      kind: 'approved',
+      heading: action === 'add' ? `Rule added to ${place}` : action === 'change' ? `Rule changed in ${place}` : `Rule removed from ${place}`,
+      detail: action === 'remove' ? 'It no longer applies.' : 'It applies from now on.',
+    };
+  }
+  if (state === 'rejected') {
+    return { kind: 'rejected', heading: action === 'add' ? 'Not added' : action === 'change' ? 'Not changed' : 'Not removed', detail: 'Nothing changed.' };
+  }
+  if (state === 'expired') {
+    return { kind: 'expired', heading: 'This request expired', detail: `Nothing changed. Ask ${assistant} again if you still want it.` };
+  }
+  if (isGone(proposal)) {
+    return { kind: 'gone', heading: 'This rule no longer applies', detail: `It was removed after ${assistant} asked, so there’s nothing to decide.` };
+  }
+  return undefined;
+}

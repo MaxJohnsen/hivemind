@@ -98,7 +98,7 @@ export class Assistant {
       return { text, failed: Boolean(result.isError) };
     };
     const tools = async () => (await client.listTools()).tools.map((tool) => tool.name).sort();
-    return { call, tools, close: () => client.close() };
+    return { call, tools, client, close: () => client.close() };
   }
 }
 

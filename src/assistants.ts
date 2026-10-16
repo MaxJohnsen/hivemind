@@ -3,10 +3,11 @@ import { createLocalJWKSet, errors, jwtVerify } from 'jose';
 import type { Pool } from 'pg';
 import { mcpResource, type Auth } from './auth.ts';
 
-/** A person, and the assistant acting for them, such as "Claude". */
+/** A person, and the assistant acting for them, such as "Claude", with the assistant's client id. */
 export interface AgentPrincipal {
   person: string;
   agent: string;
+  clientId: string;
 }
 
 /** An assistant someone has connected, and can disconnect. */
@@ -89,7 +90,7 @@ export function tokenVerifier(auth: Auth, pool: Pool, url: URL) {
       [person, clientId, claims.iat],
     );
     if (!rows[0]) return undefined;
-    return { person, agent: rows[0].name || hostOf(clientId), token: authorization.token };
+    return { person, agent: rows[0].name || hostOf(clientId), clientId, token: authorization.token };
   };
 }
 

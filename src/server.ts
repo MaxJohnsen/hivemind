@@ -29,6 +29,8 @@ export interface ServerOptions {
   fetchClientMetadata?: AuthSettings['fetchClientMetadata'];
   /** The sites whose assistants may connect. By default HOMING_ASSISTANT_SITES, or Claude's and ChatGPT's. */
   assistantSites?: string[];
+  /** The assistants, by client id, that get the approval card. By default those checked to keep the model from pressing it. */
+  cardClients?: string[];
   /** Sends email. By default from SMTP_URL, if it's set. */
   mailer?: Mailer;
   /** Whether people may sign in with a password. On unless HOMING_PASSWORDS is off. */
@@ -109,7 +111,13 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
   });
   verifyToken = tokenVerifier(homingAuth, pool, url);
 
-  mcp = toNodeHandler(createMcpHandler(({ authInfo }) => mcpServer(sql, authInfo?.extra?.principal as AgentPrincipal, url)));
+  const cards = new Set(options.cardClients ?? cardClients);
+  mcp = toNodeHandler(
+    createMcpHandler(({ authInfo }) => {
+      const principal = authInfo?.extra?.principal as AgentPrincipal;
+      return mcpServer(sql, principal, url, { card: cards.has(principal.clientId) });
+    }),
+  );
   auth = authHandler(homingAuth);
   // Refuses requests addressed to other host names, which protects a local install from DNS rebinding.
   validateHost = hostHeaderValidation(isLocal(url) ? localhostAllowedHostnames() : [url.hostname]);
@@ -129,6 +137,13 @@ export async function startServer(sql: Sql, options: ServerOptions): Promise<Hom
 
 /** The sites whose assistants may connect: Claude (claude.ai and Claude Code) and ChatGPT, unless set. */
 const assistantSites = (process.env.HOMING_ASSISTANT_SITES || 'claude.ai,chatgpt.com').split(',').map((site) => site.trim()).filter(Boolean);
+
+/**
+ * The assistants that show the approval card, and that were checked to keep
+ * the model from seeing the card's tools, so only the person can press its
+ * buttons. Every other assistant gives the person a link instead.
+ */
+const cardClients = ['https://claude.ai/oauth/mcp-oauth-client-metadata'];
 
 /** Where Homing is reached, which decides the host names it answers to. */
 export const configuredUrl = process.env.HOMING_URL ? new URL(process.env.HOMING_URL) : undefined;
