@@ -7,6 +7,10 @@ import connected from '@/assets/illustrations/connected.png';
 import resting from '@/assets/illustrations/empty.png';
 import together from '@/assets/illustrations/signin.png';
 import welcome from '@/assets/illustrations/welcome.png';
+import onePlace from '@/assets/illustrations/one-place.webp';
+import rules from '@/assets/illustrations/rules.webp';
+import sharing from '@/assets/illustrations/sharing.webp';
+import startingOver from '@/assets/illustrations/starting-over.webp';
 
 const directions = [
   {
@@ -98,6 +102,11 @@ export function Moodboard() {
         </div>
 
         <Family
+          name="New: one idea each"
+          about="Drawn for Storybook. Starting over, everything in one place, sharing on purpose, and a rule that waits for a person."
+          images={[startingOver, onePlace, sharing, rules]}
+        />
+        <Family
           name="Scenes with people"
           about="Carry the idea best: a person, the shelf of spaces, the bird bringing a card. They are wide and airy, so in a layout they read small, and they must never be cropped."
           images={[connected, welcome, together]}
@@ -110,7 +119,7 @@ export function Moodboard() {
         />
 
         <div className="flex flex-col gap-4">
-          <h3 className="text-lg font-semibold">To draw next</h3>
+          <h3 className="text-lg font-semibold">How the new drawings were made</h3>
           <div className="grid gap-4 md:grid-cols-2">
             {toDraw.map((item) => (
               <Prompt key={item.name} {...item} />

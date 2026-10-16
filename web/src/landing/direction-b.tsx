@@ -3,6 +3,10 @@ import { cn } from 'cn';
 import { copy, Footer, HeroActions, Nav, RuleCard, ShareSteps, SpacesDemo, StartOptions } from '@/landing/parts';
 import connected from '@/assets/illustrations/connected.png';
 import resting from '@/assets/illustrations/empty.png';
+import onePlace from '@/assets/illustrations/one-place.webp';
+import rules from '@/assets/illustrations/rules.webp';
+import sharing from '@/assets/illustrations/sharing.webp';
+import startingOver from '@/assets/illustrations/starting-over.webp';
 
 /**
  * Storybook: read top to bottom like a picture book. The cover is centered, with the opening
@@ -28,7 +32,7 @@ export function DirectionB() {
           <p className="t-small mt-5 text-muted-foreground">{copy.note}</p>
         </section>
 
-        <Chapter id="why" title={copy.why.title} drawing={<Vignette scene="A person at a desk buried in loose cards, explaining one again to a new paper bird" />}>
+        <Chapter id="why" title={copy.why.title} drawing={<Drawing src={startingOver} width={960} height={960} className="w-full max-w-[22rem]" />}>
           <p className="t-lead">{copy.why.body}</p>
           <p className="t-lead">{copy.why.close}</p>
         </Chapter>
@@ -38,7 +42,7 @@ export function DirectionB() {
           anchor="how"
           band
           title={copy.together.title}
-          drawing={<Planned wide scene="One shelf up close: a work folder, a tile sample and running shoes, and three paper birds each taking a card" />}
+          wide={<Drawing src={onePlace} width={1600} height={680} className="w-full" />}
           plate={<SpacesDemo />}
         >
           <p className="t-lead">{copy.together.lead}</p>
@@ -48,7 +52,7 @@ export function DirectionB() {
         <Chapter
           id="sharing"
           title={copy.sharing.title}
-          drawing={<Planned scene="Two neighbouring windows: the bird carries one card across, and a closed notebook stays on the first sill" />}
+          drawing={<Drawing src={sharing} width={1200} height={795} className="w-full" />}
           plate={
             <div className="grid items-start gap-4 md:grid-cols-2">
               <ShareSteps />
@@ -63,7 +67,7 @@ export function DirectionB() {
           id="rules"
           band
           title={copy.sharing.rules}
-          drawing={<Vignette scene="A note pinned to a wall; the bird holds up a new one, and a person with a pencil decides" />}
+          drawing={<Drawing src={rules} width={960} height={960} className="w-full max-w-[22rem]" />}
           plate={<RuleCard className="mx-auto max-w-xl" />}
         >
           <p className="t-body">{copy.sharing.rulesBody}</p>
@@ -82,12 +86,14 @@ export function DirectionB() {
 
 /**
  * A chapter: its drawing, then its heading and text in one reading column, then an optional
- * plate that runs wider. A band chapter sits on the soft ground.
+ * plate that runs wider. A wide drawing runs at plate width above the column. A band chapter
+ * sits on the soft ground.
  */
-function Chapter({ id, anchor, band, title, drawing, plate, children }: { id: string; anchor?: string; band?: boolean; title: string; drawing: ReactNode; plate?: ReactNode; children: ReactNode }) {
+function Chapter({ id, anchor, band, title, drawing, wide, plate, children }: { id: string; anchor?: string; band?: boolean; title: string; drawing?: ReactNode; wide?: ReactNode; plate?: ReactNode; children: ReactNode }) {
   return (
     <section id={anchor} aria-labelledby={id} className="px-2 sm:px-3">
       <div className={cn('rounded-[1.75rem] px-5 py-24 sm:px-8 lg:py-32', band && 'bg-muted')}>
+        {wide && <div className="mx-auto mb-10 max-w-[60rem]">{wide}</div>}
         <div className="mx-auto flex max-w-[44rem] flex-col gap-6">
           {drawing}
           <h2 id={id} className="t-heading font-semibold">{title}</h2>
@@ -99,20 +105,7 @@ function Chapter({ id, anchor, band, title, drawing, plate, children }: { id: st
   );
 }
 
-/** Where a drawing still to be made will go, at the size it will have. */
-function Planned({ scene, wide }: { scene: string; wide?: boolean }) {
-  return (
-    <div className={cn('flex items-center justify-center rounded-2xl bg-card/70 px-8 text-center', wide ? 'aspect-[16/7]' : 'aspect-[3/2]')}>
-      <p className="t-small max-w-[26rem] text-muted-foreground">Drawing to come: {scene}.</p>
-    </div>
-  );
-}
-
-/** A small drawing still to be made, set at the start of a chapter. */
-function Vignette({ scene }: { scene: string }) {
-  return (
-    <div className="flex aspect-square w-48 items-center justify-center rounded-2xl bg-card/70 p-5 text-center">
-      <p className="text-sm text-muted-foreground">Drawing to come: {scene}.</p>
-    </div>
-  );
+/** A drawing, shipped on a transparent ground so it sits on linen or a band alike. */
+function Drawing({ src, width, height, className }: { src: string; width: number; height: number; className?: string }) {
+  return <img src={src} alt="" width={width} height={height} loading="lazy" className={className} />;
 }
