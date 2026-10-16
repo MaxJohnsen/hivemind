@@ -1,448 +1,338 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { cn } from 'cn';
-import { OnlyYou } from '@/components/only-you';
 import { ProposedChange } from '@/components/proposed-change';
 import { buttonVariants } from '@/components/ui/button';
-import { Mark, Wordmark } from '@/components/wordmark';
-import birdStanding from '@/assets/illustrations/bird-standing.jpg';
+import { Wordmark } from '@/components/wordmark';
 import connected from '@/assets/illustrations/connected.png';
 import resting from '@/assets/illustrations/empty.png';
-import together from '@/assets/illustrations/signin.png';
+import onePlace from '@/assets/illustrations/one-place.webp';
+import rules from '@/assets/illustrations/rules.webp';
+import sharing from '@/assets/illustrations/sharing.webp';
+import startingOver from '@/assets/illustrations/starting-over.webp';
 import '@/landing.css';
 
-const github = 'https://github.com/MaxJohnsen/homing';
-const docs = `${github}#read-more`;
-const selfHost = `${github}/blob/main/docs/deployment.md`;
-// Homing online, where people sign in. This page itself is homing.place.
-const app = 'https://app.homing.place';
+const links = {
+  github: 'https://github.com/MaxJohnsen/homing',
+  docs: 'https://github.com/MaxJohnsen/homing#read-more',
+  selfHost: 'https://github.com/MaxJohnsen/homing/blob/main/docs/deployment.md',
+  // Homing online, where people sign in. This page itself is homing.place.
+  signIn: 'https://app.homing.place/sign-in',
+};
 
 /**
- * The landing page: what Homing is, why it exists, and the two ways to start. It has two lines
- * to align to: the page margin, and an axis at five twelfths of the width. All reading text starts
- * on the axis, the space to its left holds drawings and short notes, and wide things run from
- * margin to margin. The hero headline is the one exception, running from the margin. On a phone
- * the axis becomes the margin.
+ * The landing page, read top to bottom like a picture book. The cover and the ending are centered.
+ * Every chapter between them is one column with one left edge for its heading, text and product
+ * fragments, opened by a drawing centered above it. Drawings share one maximum height, so none
+ * outweighs the others. Chapters alternate between linen and a soft band, like turning a page.
  */
 export function Landing() {
   const root = useMotion();
   return (
     <div ref={root} className="landing bg-background text-foreground">
-      <main className="flex flex-col gap-32 pb-32 lg:gap-44 lg:pb-44">
-        <Masthead />
-        <Why />
-        <Together />
-        <Sharing />
-        <Start />
+      <Nav />
+      <main className="flex flex-col gap-4 pb-4">
+        <Cover />
+
+        <Chapter id="why" title="We got tired of starting over." drawing={<Drawing src={startingOver} width={960} height={960} />}>
+          <p className="t-lead" {...reveal(2)}>
+            Every new assistant meant explaining things again. Decisions were buried in chats, knowledge was scattered across apps, and things we’d learned together were easily lost.
+          </p>
+          <p className="t-lead" {...reveal(3)}>We made Homing because we wanted that knowledge to stay useful.</p>
+        </Chapter>
+
+        <Chapter id="together" anchor="how" band title="Bring it all together." drawing={<Drawing src={onePlace} width={1600} height={680} />}>
+          <p className="t-lead" {...reveal(2)}>Keep what matters about your projects, work and everyday life in one place.</p>
+          <p className="t-body" {...reveal(3)}>
+            Each project and part of your life gets its own space. Come back weeks later without explaining everything again, switch assistants without losing the context, and let Homing help keep it all up to date.
+          </p>
+          <SpacesDemo />
+        </Chapter>
+
+        <Chapter id="sharing" title="Let others build on it, too." drawing={<Drawing src={sharing} width={1200} height={795} />}>
+          <p className="t-lead" {...reveal(2)}>Some things are more useful when other people know them too.</p>
+          <p className="t-body" {...reveal(3)}>
+            Share a project decision with a colleague and their assistant, and everyone works from the same understanding. Everything else stays private.
+          </p>
+          <div className="mt-6 flex flex-col gap-4" {...reveal(4)}>
+            <ShareSteps />
+          </div>
+        </Chapter>
+
+        <Chapter id="rules" band title="Rules change only when you say so." drawing={<Drawing src={rules} width={960} height={960} />}>
+          <p className="t-body" {...reveal(2)}>Assistants can suggest how they should work in a space. Nothing changes until you approve it.</p>
+          <RuleCard />
+        </Chapter>
+
+        <Ending />
       </main>
       <Footer />
     </div>
   );
 }
 
-/** The page's grid: twelve columns between one pair of margins. */
-function Grid({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn('mx-auto grid w-full max-w-[1760px] grid-cols-12 gap-x-6 px-5 sm:px-8', className)}>{children}</div>;
-}
-
-/** Where reading text starts: the axis, from column 6 to the margin. */
-const axis = 'col-span-12 lg:col-span-7 lg:col-start-6';
-/** The space left of the axis, for drawings and short notes. */
-const zone = 'col-span-12 lg:col-span-4';
-
-/** A section set on a colored field that runs almost to the edges of the window. */
-function Band({ className, children }: { className?: string; children: ReactNode }) {
-  return (
-    <div className="px-2 sm:px-3">
-      <div className={cn('rounded-[1.75rem]', className)}>{children}</div>
-    </div>
-  );
-}
-
-/** How a section opens, on the axis: its heading, a larger line, then body text. */
-function Intro({ id, title, lead, children }: { id: string; title: string; lead: string; children?: ReactNode }) {
-  return (
-    <div className="flex max-w-[36rem] flex-col gap-5">
-      <h2 id={id} className="t-heading font-semibold" {...reveal(0)}>{title}</h2>
-      <p className="t-lead" {...reveal(1)}>{lead}</p>
-      {children && <div className="t-body flex flex-col gap-4" {...reveal(2)}>{children}</div>}
-    </div>
-  );
-}
-
-/** Revealed in turn as its section comes into view. */
+/** Revealed in turn as it comes into view. */
 function reveal(i: number) {
   return { 'data-reveal': '', style: { '--i': i } as CSSProperties };
 }
 
 const primary = cn(buttonVariants(), 'press h-11 px-6 text-[15px]');
 const outline = cn(buttonVariants({ variant: 'outline' }), 'press h-11 px-6 text-[15px]');
+const smallPrimary = cn(buttonVariants({ size: 'sm' }), 'px-4');
+const smallOutline = cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'px-4');
 
-function Masthead() {
+function Nav() {
   return (
-    <header>
-      <Grid className="items-center py-5">
-        <a href="/" className="col-span-6 w-fit rounded-md focus-visible:ring-[3px] focus-visible:ring-ring/70 focus-visible:outline-none">
-          <Wordmark className="text-lg" />
-        </a>
-        <nav aria-label="Homing" className="col-span-6 flex items-center justify-end gap-6 text-[15px]">
-          <a href="#how" className="link hidden md:inline">How it works</a>
-          <a href={github} className="link hidden sm:inline">GitHub</a>
-          <a href={`${app}/sign-in`} className="link">Sign in</a>
-        </nav>
-      </Grid>
-
-      <Band>
-        <div data-shutter className="shutter flex h-[32svh] min-h-64 items-end justify-center overflow-hidden rounded-[1.75rem] bg-muted sm:min-h-80">
-          {/* The bird brings what it learned home to the shelf. */}
-          <img src={connected} alt="" width={960} height={640} className="h-[128%] w-auto max-w-none translate-y-[14%]" />
-        </div>
-      </Band>
-
-      <Grid className="pt-10 lg:pt-12">
-        <h1 className="t-display col-span-12 font-semibold" {...reveal(0)}>
-          A home for everything
-          <br className="hidden sm:block" /> worth knowing.
-        </h1>
-        <p className={cn(zone, 't-small mt-10 text-muted-foreground max-lg:order-last lg:mt-12 lg:self-end')} {...reveal(4)}>
-          Open source. Works with the assistants you already use.
-        </p>
-        <div className={cn(axis, 'mt-8 flex max-w-[36rem] flex-col gap-4 lg:mt-12')}>
-          <p className="t-lead" {...reveal(1)}>Your life and work don’t fit into one conversation.</p>
-          <p className="t-body" {...reveal(2)}>
-            Homing gives your AI assistants a shared place to remember what matters, build on what they learn, and pick up where you left off.
-          </p>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row" {...reveal(3)}>
-            <a href="#start" className={primary}>Get started</a>
-            <a href="#how" className={outline}>See how it works</a>
-          </div>
-        </div>
-      </Grid>
+    <header className="mx-auto flex max-w-[1280px] items-center justify-between px-5 py-5 sm:px-8">
+      <a href="/" className="rounded-md focus-visible:ring-[3px] focus-visible:ring-ring/70 focus-visible:outline-none">
+        <Wordmark className="text-lg" />
+      </a>
+      <nav aria-label="Homing" className="flex items-center gap-6 text-[15px]">
+        <a href="#how" className="link hidden sm:inline">How it works</a>
+        <a href={links.github} className="link hidden sm:inline">GitHub</a>
+        <a href={links.signIn} className="link">Sign in</a>
+      </nav>
     </header>
   );
 }
 
-function Why() {
+/** A drawing, centered, at the height every drawing on the page shares. */
+function Drawing({ src, width, height }: { src: string; width: number; height: number }) {
   return (
-    <section aria-labelledby="why">
-      <Grid className="gap-y-8">
-        <div className={cn(zone, 'max-lg:hidden')}>
-          <img src={birdStanding} alt="" width={310} height={260} className="on-paper ml-auto w-40" {...reveal(0)} />
-        </div>
-        <div className={axis}>
-          <Intro id="why" title="We got tired of starting over." lead="Every new assistant meant explaining things again. Decisions were buried in chats, knowledge was scattered across apps, and things we’d learned together were easily lost.">
-            <p>We made Homing because we wanted that knowledge to stay useful.</p>
-          </Intro>
-        </div>
-      </Grid>
+    <div className="flex justify-center" {...reveal(0)}>
+      <img src={src} alt="" width={width} height={height} loading="lazy" className="h-auto max-h-[20rem] w-auto max-w-full" />
+    </div>
+  );
+}
+
+/** The cover: the opening drawing, the title and the way in, all centered. */
+function Cover() {
+  return (
+    <section className="mx-auto flex w-full max-w-[44rem] flex-col items-center px-5 pt-6 pb-24 text-center sm:px-8 lg:pb-32">
+      {/* The bird brings what it learned home to the shelf. */}
+      <img src={connected} alt="" width={960} height={640} className="h-auto max-h-[20rem] w-auto max-w-full" />
+      <h1 className="t-display mt-8 font-semibold" {...reveal(0)}>A home for everything worth knowing.</h1>
+      <p className="t-lead mt-6 max-w-[34rem]" {...reveal(1)}>Your life and work don’t fit into one conversation.</p>
+      <p className="t-body mt-4 max-w-[34rem]" {...reveal(2)}>
+        Homing gives your AI assistants a shared place to remember what matters, build on what they learn, and pick up where you left off.
+      </p>
+      <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row" {...reveal(3)}>
+        <a href="#start" className={primary}>Get started</a>
+        <a href="#how" className={outline}>See how it works</a>
+      </div>
+      <p className="t-small mt-5 text-muted-foreground" {...reveal(4)}>Open source, and designed for Claude, ChatGPT, Copilot and more.</p>
     </section>
   );
 }
 
-// Ana's Homing: work, home and the rest of life, each in its own space.
-type Card = { id: string; text: ReactNode; by: string };
-type Space = { name: string; who: ReactNode; cards: Card[] };
-
-const spaces: Space[] = [
-  {
-    name: 'Acme launch',
-    who: 'With Cara',
-    cards: [
-      { id: 'launch', text: <>Launch moved to <s className="text-muted-foreground">2 November</s> 14 November</>, by: 'Updated by Copilot on Monday' },
-      { id: 'press', text: 'Cara owns the press list', by: 'Saved by Claude on 3 October' },
-    ],
-  },
-  {
-    name: 'Kitchen',
-    who: 'With Jon',
-    cards: [
-      { id: 'tiles', text: 'Sage green tiles, 10 × 10 cm', by: 'Saved by Claude on 28 September' },
-      { id: 'electrician', text: 'Electrician comes 3 November, before the tiling', by: 'Saved by ChatGPT on 9 October' },
-    ],
-  },
-  {
-    name: 'Half marathon',
-    who: <OnlyYou />,
-    cards: [
-      { id: 'sunday', text: 'Long runs on Sundays, 18 km this week', by: 'Saved by ChatGPT yesterday' },
-      { id: 'race', text: 'Race day is 8 March', by: 'Saved by Claude in August' },
-    ],
-  },
-  {
-    name: 'Personal',
-    who: <OnlyYou />,
-    cards: [
-      { id: 'mornings', text: 'Mornings are for deep work', by: 'Saved by Claude in July' },
-      { id: 'plain', text: 'Write to me in plain words', by: 'A rule you added' },
-    ],
-  },
-];
-
-const questions = [
-  {
-    ask: 'When is the Acme launch?',
-    assistant: 'Copilot',
-    answer: '14 November. It moved from 2 November on Monday, and Cara has the press list.',
-    uses: ['launch', 'press'],
-  },
-  {
-    ask: 'Which tiles did we pick?',
-    assistant: 'Claude',
-    answer: 'The sage green ones, 10 × 10 cm. The electrician comes on 3 November, so tiling can start after that.',
-    uses: ['tiles', 'electrician'],
-  },
-  {
-    ask: 'How far is Sunday’s run?',
-    assistant: 'ChatGPT',
-    answer: '18 km at an easy pace. You keep your long runs for Sundays, and race day is 8 March.',
-    uses: ['sunday', 'race'],
-  },
-];
-
-function Together() {
-  const [asked, setAsked] = useState(0);
-  const question = questions[asked];
-  const shelf = useRef<HTMLDivElement>(null);
-
-  // On a phone the spaces are a row to swipe through, so bring the one being asked about into view.
-  const ask = (i: number) => {
-    setAsked(i);
-    const row = shelf.current;
-    const used = row?.querySelector<HTMLElement>(`[data-card="${questions[i].uses[0]}"]`)?.closest<HTMLElement>('[data-space]');
-    if (row && used && row.scrollWidth > row.clientWidth) row.scrollTo({ left: used.offsetLeft - row.offsetLeft, behavior: 'smooth' });
-  };
-
+/**
+ * A chapter: its drawing centered at the top, then its heading, text and product fragments on
+ * one left edge in one column. A band chapter sits on the soft ground.
+ */
+function Chapter({ id, anchor, band, title, drawing, children }: { id: string; anchor?: string; band?: boolean; title: string; drawing: ReactNode; children: ReactNode }) {
   return (
-    <section id="how" aria-labelledby="together">
-      <Band className="bg-muted py-20 lg:py-32">
-        <Grid className="gap-y-16">
-          <div className={axis}>
-            <Intro id="together" title="Bring it all together." lead="Keep what matters about your projects, work and everyday life in one place.">
-              <p>
-                Come back to something weeks later without explaining everything again. Switch assistants without losing the context. Let Homing help keep what you’ve learned organized and up to date.
-              </p>
-            </Intro>
-          </div>
+    <section id={anchor} aria-labelledby={id} className="px-2 sm:px-3">
+      <div className={cn('rounded-[1.75rem] px-5 py-24 sm:px-8 lg:py-32', band && 'bg-muted')}>
+        <div className="mx-auto flex w-full max-w-[44rem] flex-col gap-6">
+          {drawing}
+          <h2 id={id} className="t-heading mt-6 font-semibold" {...reveal(1)}>{title}</h2>
+          {children}
+        </div>
+      </div>
+    </section>
+  );
+}
 
-          {/* The one thing to try: ask, and see which of Ana's cards the answer came from. */}
-          <div className={cn(zone, 'flex flex-col gap-4')} {...reveal(0)}>
-            <p className="t-small text-muted-foreground">Ask from any assistant.</p>
-            <div className="flex flex-wrap gap-2 lg:flex-col lg:items-start">
-              {questions.map((item, i) => (
-                <button
-                  key={item.ask}
-                  type="button"
-                  aria-pressed={i === asked}
-                  onClick={() => ask(i)}
-                  className={cn(
-                    'press rounded-full border px-4 py-2 text-left text-[15px] focus-visible:ring-[3px] focus-visible:ring-ring/70 focus-visible:outline-none',
-                    i === asked ? 'border-primary bg-primary text-primary-foreground' : 'border-input/40 bg-card hover:border-input',
-                  )}
-                >
-                  {item.ask}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div data-ui aria-live="polite" className={cn(axis, '-mt-10 lg:mt-0 lg:pt-9')} {...reveal(1)}>
-            <div key={asked} className="arrive flex max-w-[36rem] flex-col gap-2 rounded-2xl bg-card px-5 py-4">
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">{question.assistant}</span>
-                <span aria-hidden="true">·</span>
-                from Homing
-              </p>
-              <p className="text-[15px] leading-relaxed">{question.answer}</p>
-            </div>
-          </div>
+// Ana's Homing: three spaces, each with a couple of things her assistants have learned.
+const spaces = [
+  { id: 'acme', name: 'Acme launch', notes: ['Launch is November 14', 'Cara owns the press list'] },
+  { id: 'kitchen', name: 'Kitchen', notes: ['Sage green tiles, 10 × 10 cm', 'Electrician comes November 3'] },
+  { id: 'race', name: 'Half marathon', notes: ['Race day is March 8', 'Long runs on Sundays'] },
+];
 
-          <div
-            ref={shelf}
-            data-ui
-            className="col-span-12 -mx-5 -mt-6 flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4"
-            {...reveal(2)}
-          >
-            {spaces.map((space) => (
-              <div key={space.name} data-space className="flex w-[82%] shrink-0 snap-start flex-col gap-3 rounded-2xl bg-background p-3 sm:w-auto">
-                <div className="flex items-center justify-between gap-2 px-1 pt-1">
-                  <h3 className="text-[15px] font-semibold">{space.name}</h3>
-                  <span className="text-sm text-muted-foreground">{space.who}</span>
-                </div>
-                {space.cards.map((card) => {
-                  const used = question.uses.includes(card.id);
-                  return (
-                    <div key={card.id} data-card={card.id} className={cn('kept flex flex-col gap-1 rounded-xl border bg-card px-3.5 py-3', used && 'border-primary/50 bg-change')}>
-                      <p className="text-[15px] leading-snug">{card.text}</p>
-                      <p className="text-sm text-muted-foreground">{card.by}</p>
-                    </div>
-                  );
-                })}
-              </div>
+const asks = [
+  { assistant: 'Claude', question: 'When is the Acme launch?', answer: 'November 14, and Cara owns the press list.', uses: 'acme' },
+  { assistant: 'ChatGPT', question: 'Which tiles did we pick?', answer: 'The sage green ones, 10 × 10 cm. The electrician comes November 3, so tiling starts after that.', uses: 'kitchen' },
+  { assistant: 'Copilot', question: 'When is my race?', answer: 'March 8. Your long runs are on Sundays.', uses: 'race' },
+];
+
+/** The one thing to try: ask from any assistant, and see the space its answer came from. */
+function SpacesDemo() {
+  const [asked, setAsked] = useState(0);
+  const ask = asks[asked];
+  return (
+    <figure className="mt-6 flex flex-col gap-3" {...reveal(4)}>
+      <div data-ui className="flex flex-col gap-5 rounded-2xl border bg-card p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[15px] font-semibold">Ana’s Homing</p>
+          <div role="group" aria-label="Ask from" className="flex rounded-full bg-muted p-1">
+            {asks.map((item, i) => (
+              <button
+                key={item.assistant}
+                type="button"
+                aria-pressed={i === asked}
+                onClick={() => setAsked(i)}
+                className={cn(
+                  'press rounded-full px-3.5 py-1.5 text-sm focus-visible:ring-[3px] focus-visible:ring-ring/70 focus-visible:outline-none',
+                  i === asked ? 'bg-card text-foreground ring-1 ring-input' : 'text-foreground/70 hover:text-foreground',
+                )}
+              >
+                <span className="max-sm:sr-only">Ask </span>
+                {item.assistant}
+              </button>
             ))}
           </div>
-        </Grid>
-      </Band>
-    </section>
-  );
-}
-
-/** One step of sharing: what someone says, then what comes back. */
-function Exchange({ step, who, said, children }: { step: string; who: string; said: string; children: ReactNode }) {
-  return (
-    <li className="flex flex-col gap-3">
-      <p className="t-body font-semibold" {...reveal(0)}>{step}</p>
-      <div className="rounded-2xl bg-muted px-5 py-4" {...reveal(1)}>
-        <p className="text-sm text-muted-foreground">{who}</p>
-        <p className="mt-1 text-[15px] leading-relaxed">{said}</p>
-      </div>
-      <div data-ui className="sm:ml-10" {...reveal(2)}>
-        {children}
-      </div>
-    </li>
-  );
-}
-
-function Sharing() {
-  return (
-    <section aria-labelledby="sharing">
-      <Grid className="gap-y-10">
-        <div className={zone}>
-          {/* Two people at the same shelf, beside the story as it scrolls. */}
-          <img src={together} alt="" width={960} height={640} loading="lazy" className="mx-auto w-full max-w-sm lg:sticky lg:top-16 lg:max-w-none" {...reveal(0)} />
         </div>
-        <div className={axis}>
-          <Intro id="sharing" title="Let others build on it, too." lead="Some things are more useful when other people know them too.">
-            <p>
-              Share a project decision with a colleague and their assistant. Keep everyone working from the same understanding, while the things you want to keep private stay yours.
-            </p>
-            <p>You choose what to share, and changes to your rules need your approval.</p>
-          </Intro>
 
-          <ol className="mt-16 flex max-w-[36rem] flex-col gap-16">
-            <Exchange step="First, you share a decision." who="Ana, in Claude" said="Let the Acme team know the launch moved to 14 November.">
-              <div className="flex flex-col gap-4 rounded-2xl border bg-card p-5">
-                <div className="flex flex-col gap-1">
-                  <p className="text-lg font-semibold tracking-tight">Share this with Acme launch?</p>
-                  <p className="text-sm text-muted-foreground">Cara and her assistant will see it.</p>
-                </div>
-                <ProposedChange kind="preference" label="Knowledge" text="Launch moved to 14 November" />
-                <div className="flex gap-2">
-                  <span className={cn(buttonVariants({ size: 'sm' }), 'px-4')}>Share</span>
-                  <span className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'px-4')}>Keep it to myself</span>
-                </div>
-              </div>
-            </Exchange>
-
-            <Exchange step="Then Cara’s assistant knows it too." who="Cara, in ChatGPT" said="When do we launch?">
-              <div className="flex flex-col gap-3 rounded-2xl border bg-card p-5">
-                <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">ChatGPT</span>
-                  <span aria-hidden="true">·</span>
-                  from Homing
-                </p>
-                <p className="text-[15px] leading-relaxed">14 November. Ana shared the new date on Monday.</p>
-                <p className="text-sm text-muted-foreground">Ana’s kitchen and her training stay with Ana.</p>
-              </div>
-            </Exchange>
-
-            <Exchange step="Rules change only when you say so." who="Claude, to Ana" said="You’ve asked for Friday updates three times now. Should that be a rule for Acme?">
-              <div className="flex flex-col gap-4 rounded-2xl border bg-card p-5">
-                <p className="text-lg font-semibold tracking-tight">Claude wants to add a rule to Acme launch</p>
-                <ProposedChange kind="requirement" text="Send Acme status updates on Fridays." />
-                <p className="text-sm text-muted-foreground">It applies to everyone’s assistant in Acme launch. Nothing changes until you approve.</p>
-                <div className="flex gap-2">
-                  <span className={cn(buttonVariants({ size: 'sm' }), 'px-4')}>Approve rule</span>
-                  <span className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'px-4')}>Decline</span>
-                </div>
-              </div>
-            </Exchange>
-          </ol>
-        </div>
-      </Grid>
-    </section>
-  );
-}
-
-function Start() {
-  return (
-    <section id="start" aria-labelledby="start-title">
-      <Band className="relative overflow-hidden bg-accent">
-        <Grid className="relative z-10 gap-y-12 py-20 lg:min-h-[80svh] lg:content-center lg:py-32">
-          <div className={cn(axis, 'flex flex-col gap-12')}>
-            <h2 id="start-title" className="t-heading font-semibold" {...reveal(0)}>Make yourself at home.</h2>
-            <div className="grid gap-12 sm:grid-cols-2 sm:gap-8">
-              <div className="flex flex-col gap-2" {...reveal(1)}>
-                <h3 className="t-body font-semibold">Use Homing online</h3>
-                <p className="t-body">Get started without setting up a server.</p>
-                <a href={`${app}/sign-in`} className={cn(primary, 'mt-4 w-full sm:w-fit')}>Get started free</a>
-              </div>
-              <div className="flex flex-col gap-2" {...reveal(2)}>
-                <h3 className="t-body font-semibold">Host Homing yourself</h3>
-                <p className="t-body">Homing is open source. Run it on your own infrastructure.</p>
-                <a href={selfHost} className={cn(outline, 'mt-4 w-full sm:w-fit')}>Self-host Homing</a>
-              </div>
-            </div>
+        <div key={asked} aria-live="polite" className="arrive flex flex-col gap-3">
+          <p className="max-w-[85%] self-end rounded-2xl bg-muted px-4 py-2.5 text-[15px]">{ask.question}</p>
+          <div className="flex max-w-[90%] flex-col gap-1">
+            <p className="text-sm font-semibold">{ask.assistant}</p>
+            <p className="text-[15px] leading-relaxed">{ask.answer}</p>
           </div>
-        </Grid>
-        {/* The bird, home at last, asleep in its box. On a desktop the band's edges crop it. */}
-        <img
-          src={resting}
-          alt=""
-          width={960}
-          height={640}
-          loading="lazy"
-          className="pointer-events-none mx-auto -mt-16 -mb-6 w-[110%] max-w-none lg:absolute lg:bottom-[-12%] lg:left-[-6%] lg:m-0 lg:w-[46%]"
-        />
-      </Band>
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-3">
+          {spaces.map((space) => {
+            const used = space.id === ask.uses;
+            return (
+              <div key={space.id} className={cn('kept flex flex-col gap-1.5 rounded-xl bg-background p-3', used ? 'ring-2 ring-primary' : 'opacity-55')}>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">{space.name}</p>
+                  {used && <span className="text-xs font-medium text-primary">Used</span>}
+                </div>
+                {space.notes.map((note) => (
+                  <p key={note} className="text-sm leading-snug">{note}</p>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <figcaption className="t-small text-muted-foreground">Every assistant answers from the same place.</figcaption>
+    </figure>
+  );
+}
+
+/** A conversation in an assistant: the person on the right, the assistant on the left. */
+function Chat({ where, children }: { where: string; children: ReactNode }) {
+  return (
+    <div data-ui className="flex flex-col gap-3 rounded-2xl border bg-card p-4 sm:p-5">
+      <p className="text-sm text-muted-foreground">{where}</p>
+      {children}
+    </div>
+  );
+}
+
+function Said({ children }: { children: ReactNode }) {
+  return <p className="max-w-[85%] self-end rounded-2xl bg-muted px-4 py-2.5 text-[15px]">{children}</p>;
+}
+
+function Replied({ assistant, children }: { assistant: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-sm font-semibold">{assistant}</p>
+      <div className="text-[15px] leading-relaxed">{children}</div>
+    </div>
+  );
+}
+
+/** Ana shares a decision, and Cara's assistant knows it. */
+function ShareSteps() {
+  return (
+    <>
+      <Chat where="Ana, in Claude">
+        <Said>The Acme launch moved to November 14.</Said>
+        <Replied assistant="Claude">
+          <p>Saved for you. Share it with Acme launch? Cara will see it.</p>
+          <div className="mt-3 flex gap-2">
+            <span className={smallPrimary}>Share</span>
+            <span className={smallOutline}>Keep private</span>
+          </div>
+        </Replied>
+      </Chat>
+      <Chat where="Cara, in ChatGPT">
+        <Said>When do we launch?</Said>
+        <Replied assistant="ChatGPT">
+          <p>November 14. Ana shared the new date on Monday.</p>
+        </Replied>
+      </Chat>
+    </>
+  );
+}
+
+/** An assistant suggests a rule, and only a person can add it. */
+function RuleCard() {
+  return (
+    <div data-ui className="mt-6 flex flex-col gap-4 rounded-2xl border bg-card p-4 sm:p-5" {...reveal(3)}>
+      <p className="text-lg font-semibold">Claude suggests a rule for Acme launch</p>
+      <ProposedChange kind="requirement" label="Rule" text="Send status updates on Fridays." />
+      <p className="text-sm text-muted-foreground">Only you can approve this.</p>
+      <div className="flex gap-2">
+        <span className={smallPrimary}>Add rule</span>
+        <span className={smallOutline}>Don’t add</span>
+      </div>
+    </div>
+  );
+}
+
+/** The ending mirrors the cover: the bird asleep in its box, and the two ways to start. */
+function Ending() {
+  return (
+    <section id="start" aria-labelledby="start-title" className="mx-auto flex w-full max-w-[44rem] flex-col items-center px-5 pt-24 pb-28 text-center sm:px-8 lg:pt-32 lg:pb-36">
+      <img src={resting} alt="" width={960} height={640} loading="lazy" className="h-auto max-h-[16rem] w-auto max-w-full" {...reveal(0)} />
+      <h2 id="start-title" className="t-heading mt-4 font-semibold" {...reveal(1)}>Make yourself at home.</h2>
+      <div className="mt-12 grid w-full gap-12 sm:grid-cols-2 sm:gap-8">
+        <div className="flex flex-col items-center gap-2" {...reveal(2)}>
+          <h3 className="t-body font-semibold">Host Homing yourself</h3>
+          <p className="t-body">Homing is open source. Run it on your own server.</p>
+          <a href={links.selfHost} className={cn(primary, 'mt-4 w-full sm:w-auto')}>Read the setup guide</a>
+        </div>
+        <div className="flex flex-col items-center gap-2" {...reveal(3)}>
+          <h3 className="t-body font-semibold">Use Homing online</h3>
+          <p className="t-body">Homing online is invite-only while we build it.</p>
+          <a href={links.signIn} className={cn(outline, 'mt-4 w-full sm:w-auto')}>Sign in</a>
+        </div>
+      </div>
     </section>
   );
 }
 
+/** A quiet close, centered like the cover: the name, a line and the links. */
 function Footer() {
   return (
     <footer className="bg-foreground text-background [--mark-dark:#a9c2ad] [--mark-light:#d3e0d4]">
-      <Grid className="gap-y-6 pt-16 lg:pt-20">
-        <p className={cn(zone, 't-lead')}>Built in the open, for everyone.</p>
-        <ul className={cn(axis, 't-small flex gap-6 lg:pt-1')}>
-          <li><a href={github} className="link">GitHub</a></li>
-          <li><a href={docs} className="link">Documentation</a></li>
-          <li><a href="#why" className="link">About</a></li>
+      <div className="mx-auto flex max-w-[44rem] flex-col items-center gap-6 px-5 py-16 text-center sm:px-8 sm:py-20">
+        <Wordmark className="text-3xl" />
+        <p className="t-lead">Built in the open, for everyone.</p>
+        <ul className="t-small flex gap-6">
+          <li><a href={links.github} className="link rounded-sm focus-visible:ring-[3px] focus-visible:ring-background/60 focus-visible:outline-none">GitHub</a></li>
+          <li><a href={links.docs} className="link rounded-sm focus-visible:ring-[3px] focus-visible:ring-background/60 focus-visible:outline-none">Documentation</a></li>
         </ul>
-      </Grid>
-      <Grid className="gap-y-4 pt-28 pb-8 lg:pt-40">
-        {/* The name returns across the width of the page. */}
-        <p aria-hidden="true" className="col-span-12 flex items-center gap-[0.12em] text-[clamp(4rem,19vw,22rem)] leading-none font-semibold tracking-[-0.05em]">
-          <Mark className="size-[0.72em]" />
-          Homing
-        </p>
-        <p className="t-small col-span-12 opacity-70">© 2026 Max Aasbø. Homing is licensed under AGPL-3.0.</p>
-      </Grid>
+        <p className="t-small opacity-70">© 2026 Max Aasbø. Licensed under AGPL-3.0.</p>
+      </div>
     </footer>
   );
 }
 
-/** Opens the masthead and reveals each part of a section once it comes into view. */
+/** Reveals each part once it comes into view. */
 function useMotion() {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const page = root.current;
     if (!page) return;
     page.classList.add('moving');
-    const shutter = page.querySelector('[data-shutter]');
-    requestAnimationFrame(() => requestAnimationFrame(() => shutter?.classList.add('is-in')));
     const parts = page.querySelectorAll('[data-reveal]');
     if (!('IntersectionObserver' in window)) {
       parts.forEach((part) => part.classList.add('is-in'));
       return;
     }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          entry.target.classList.add('is-in');
-          observer.unobserve(entry.target);
-        }
-      },
-      { rootMargin: '0px' },
-    );
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add('is-in');
+        observer.unobserve(entry.target);
+      }
+    });
     parts.forEach((part) => observer.observe(part));
     return () => observer.disconnect();
   }, []);

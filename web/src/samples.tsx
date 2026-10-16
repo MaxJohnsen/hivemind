@@ -8,20 +8,12 @@ import { Confirm } from '@/screens/confirm';
 import { Connect } from '@/screens/connect';
 import { Join } from '@/screens/join';
 import { Landing } from '@/screens/landing';
-import { Moodboard } from '@/screens/moodboard';
-import { DirectionA } from '@/landing/direction-a';
-import { DirectionB } from '@/landing/direction-b';
-import { DirectionC } from '@/landing/direction-c';
 import { Recover } from '@/screens/recover';
 import { SignIn } from '@/screens/sign-in';
 
 // Every screen with sample data, for `npm run dev:web`. Each state has its own address for review.
 const screens: Record<string, { label: string; render: () => ReactNode }> = {
   '/landing': { label: 'Landing page', render: () => <Landing /> },
-  '/moodboard': { label: 'Landing page directions', render: () => <Moodboard /> },
-  '/moodboard/a': { label: 'Landing page: two columns', render: () => <DirectionA /> },
-  '/moodboard/b': { label: 'Landing page: storybook', render: () => <DirectionB /> },
-  '/moodboard/c': { label: 'Landing page: product first', render: () => <DirectionC /> },
   '/sign-in': { label: 'Sign in', render: () => <SignIn /> },
   '/sign-in/providers': { label: 'Sign in, with Google and Microsoft set up', render: () => <SignIn providers={['google', 'microsoft']} /> },
   '/sign-in/connect': { label: 'Sign in to connect Claude', render: () => <SignIn connecting="Claude" /> },
