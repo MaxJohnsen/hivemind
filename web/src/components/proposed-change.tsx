@@ -23,9 +23,9 @@ export function ProposedChange({ kind, text, label, onlyYou, settled, className 
   const long = text.length > 120 || text.includes('\n');
   return (
     <figure className={cn('flex flex-col gap-1.5 rounded-lg bg-change px-4 py-3.5', settled && 'bg-muted', className)}>
-      <figcaption className="flex items-center justify-between gap-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <figcaption className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
         {label ?? kindLabel[kind]}
-        {onlyYou && <OnlyYou className="tracking-normal normal-case" />}
+        {onlyYou && <OnlyYou />}
       </figcaption>
       <blockquote
         className={cn(

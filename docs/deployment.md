@@ -47,6 +47,8 @@ docker compose up -d --build
 
 Migrations run before the server starts. Back up the database and `.env` together, since a restored database needs the same secret.
 
+Claude.ai keeps the list of Homing's tools it got when someone connected it. After an update that changes the tools, such as one that adds the approval card, people disconnect Homing in Claude.ai's connector settings and connect it again.
+
 ## When someone can't sign in
 
 With email, "Can't sign in?" on the sign-in page sends a one-time link to the person's verified address. Without email, you give them one. It works once, for 15 minutes, and only signs them in, so they can add a new passkey:

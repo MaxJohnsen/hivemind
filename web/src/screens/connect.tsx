@@ -56,7 +56,7 @@ export function Connect({
             <Button size="lg" className="h-11 text-[15px] sm:px-5" disabled={busy} onClick={() => choose(true)}>Connect {assistant.name}</Button>
           </div>
           {message && <FieldError>{message}</FieldError>}
-          <p className="text-xs text-muted-foreground">You can disconnect it at any time from your account.</p>
+          <p className="text-sm text-muted-foreground">You can disconnect it at any time from your account.</p>
         </div>
       </main>
     </div>

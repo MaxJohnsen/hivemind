@@ -57,7 +57,7 @@ Linen backgrounds, sage for actions and peach for what's only yours. Light only 
 | `change` | `#EEF3EC` | The exact change being decided |
 | `wash` | `#E9A98F` | Peach, for small accents |
 
-Figtree is the only typeface, and it ships with the app. Page titles are 24 px, the exact change 18 px, body text 15 px, secondary text 13 to 14 px and labels 12 px. Corners start at 14 px, and buttons and fields are pills.
+Figtree is the only typeface, and it ships with the app. Page titles are 24 px, section headings and the exact change 18 px, body text 15 px, secondary text 14 px, and small labels such as "Only you" 12 px. That is the whole scale. Hierarchy comes from it, two weights and the muted color, never from another size, capitals or letter-spacing. Corners start at 14 px, and buttons and fields are pills.
 
 ## Components
 

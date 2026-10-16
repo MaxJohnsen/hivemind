@@ -24,7 +24,7 @@ export function ApprovalCard({ proposal, decide, message: initialMessage }: { pr
 
   return (
     <section aria-label="Approve a change" className="flex flex-col gap-4 rounded-xl border bg-card p-4 text-card-foreground sm:p-5">
-      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+      <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
         <Wordmark className="text-sm text-foreground" />
         {proposal && <span>{outcome ? status[outcome.kind] : 'Waiting for you'}</span>}
       </div>
