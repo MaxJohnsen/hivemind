@@ -114,9 +114,13 @@ Inside an assistant the approval card takes the host's colors, font and corners,
 
 homing.place introduces Homing to someone meeting it for the first time. It is a site of its own, never part of Homing, so a self-hosted Homing doesn't carry it.
 
-- It aligns to two lines: the page margin, and an axis at five twelfths of the width. Reading text starts on the axis, drawings and short notes sit to its left, and wide things run from margin to margin. The headline is the one exception, from the margin. On a phone the axis is the margin.
-- Because it introduces rather than asks for a decision, its type is larger: the headline, section headings, one larger line at 24 px, body text at 18 px and small notes at 15 px. Product fragments on it keep the app's own scale.
-- Drawings appear here as on welcome pages, with the bird carrying the page from the first screen to its box at the end.
+It reads like a picture book, one chapter per idea.
+
+- The cover and the ending are centered: the drawing, the title or closing line, and the way in. Everything between them sits in one column with one left edge for headings, text and product fragments. Nothing in a chapter is wider or narrower than that column.
+- Each chapter opens with its own drawing, centered above the column. All drawings share one maximum height, so none outweighs the others, and none is cropped.
+- Chapters alternate between linen and the muted band.
+- Every drawing shows the one idea of its chapter: knowledge scattered and explained again, work and everyday life in one place, one card shared while the notebook stays, and a rule waiting for a person to decide. The bird opens the page carrying a card home and ends it asleep in its box.
+- Because it introduces rather than asks for a decision, its type is larger: the title, chapter headings, one larger line at 22 px, body text at 18 px and small notes at 15 px. Product fragments keep the app's own scale.
 
 ## Working on screens
 
