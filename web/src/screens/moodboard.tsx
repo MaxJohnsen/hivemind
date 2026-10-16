@@ -31,24 +31,24 @@ const style =
 
 const toDraw = [
   {
-    name: 'A wide opening',
-    why: 'The current opening scene is 3:2, so a wide band crops it. A wide drawing fills the top of the page without cropping.',
-    scene: 'The paper bird from the reference sheet flies from left to right across a wide empty space, carrying a blank index card toward a small wooden shelf of boxes at the far right. A very wide 3:1 composition.',
+    name: 'We got tired of starting over',
+    why: 'Says: knowledge gets scattered, and you explain everything again. A small square vignette.',
+    scene: 'A person sits at a desk buried in loose index cards and notes, some fallen to the floor. They hold up one card and patiently explain it, again, to a new paper bird from the reference sheet, which listens with its head tilted. Square composition.',
   },
   {
-    name: 'Everything in one place',
-    why: 'For "Bring it all together": work and everyday life side by side.',
-    scene: 'A person at a kitchen table with a cup of tea. On a shelf behind them, three small boxes: one with a green tile sample, one with running shoes, one with a work folder. The paper bird brings an index card from one of the boxes to the person.',
+    name: 'Bring it all together',
+    why: 'Says: work and everyday life in one place, and any assistant can use it. A wide close-up, unlike the other scenes.',
+    scene: 'A close-up of one wooden shelf with three open boxes: one holds a work folder, one a green tile sample, one a pair of running shoes. Three paper birds from the reference sheet, in slightly different poses, each take an index card from a different box. Wide 16:7 composition, no people.',
   },
   {
-    name: 'Shared, and private',
-    why: 'For sharing: one card travels to a colleague, and the notebook stays put. It uses the design’s "only yours" object.',
-    scene: 'Two people at two separate desks in a bright room. The paper bird flies between them carrying one index card. On the first desk a closed notebook stays where it is.',
+    name: 'Let others build on it, too',
+    why: 'Says: you share on purpose, and what is private stays private. Uses the design’s closed notebook for "only yours".',
+    scene: 'Two neighbouring windows seen from outside, each with a person inside. The paper bird from the reference sheet flies between them carrying one index card from the left window to the right. On the left windowsill a closed notebook stays where it is. 3:2 composition.',
   },
   {
-    name: 'A rule on the wall',
-    why: 'For rules changing only with approval, drawn as the design’s pinned note.',
-    scene: 'A note pinned to a wall above a desk. A person reads it with a pencil in hand, deciding. The paper bird waits on the desk beside them.',
+    name: 'Rules change only when you say so',
+    why: 'Says: an assistant suggests, a person decides. Uses the design’s pinned note for a rule. A small square vignette.',
+    scene: 'A note pinned to a wall above a desk. The paper bird from the reference sheet holds up a new note in its beak, and a person with a pencil in hand looks at it, deciding. Square composition.',
   },
 ];
 
@@ -94,7 +94,7 @@ export function Moodboard() {
       <section aria-labelledby="drawings" className="flex flex-col gap-10">
         <div className="flex flex-col gap-2">
           <h2 id="drawings" className="text-lg font-semibold">Drawings</h2>
-          <p className="max-w-[42rem] text-[15px] leading-relaxed text-muted-foreground">What we have, in two families, and what we would draw next. Every new drawing is made with the bird’s character sheet as a reference.</p>
+          <p className="max-w-[42rem] text-[15px] leading-relaxed text-muted-foreground">What we have, and the four drawings Storybook needs, one idea each. Every new drawing is made with the bird’s character sheet as a reference.</p>
         </div>
 
         <Family
