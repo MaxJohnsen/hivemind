@@ -153,18 +153,18 @@ function Face({ who }: { who: Who }) {
   return <img src={faces[who]} alt={who} title={who} width={128} height={128} className="size-7 rounded-full bg-muted object-cover" />;
 }
 
-const homes: { name: string; people: Who[]; spaces: { name: string; people?: Who[]; closed?: boolean }[] }[] = [
-  { name: 'Ana’s home', people: ['Ana'], spaces: [{ name: 'Kitchen' }, { name: 'Half marathon' }, { name: 'Family trip' }] },
+// A home shows whose it is; a shared space shows, on each space inside it, who reaches that space.
+const homes: { name: string; owner?: Who; spaces: { name: string; people?: Who[]; closed?: boolean }[] }[] = [
+  { name: 'Ana’s home', owner: 'Ana', spaces: [{ name: 'Kitchen' }, { name: 'Half marathon' }, { name: 'Family trip' }] },
   {
     name: 'Juniper',
-    people: ['Ana', 'Ben'],
     spaces: [
       { name: 'Website launch', people: ['Ana', 'Ben'] },
       { name: 'Brand refresh', people: ['Ana', 'Ben'] },
       { name: 'Budget', people: ['Ana'], closed: true },
     ],
   },
-  { name: 'Ben’s home', people: ['Ben'], spaces: [{ name: 'Garden' }, { name: 'Book club' }] },
+  { name: 'Ben’s home', owner: 'Ben', spaces: [{ name: 'Garden' }, { name: 'Book club' }] },
 ];
 
 /**
@@ -177,13 +177,9 @@ function SpacesMap() {
       <div data-ui className="grid gap-3 sm:grid-cols-3">
         {homes.map((home) => (
           <div key={home.name} className="flex flex-col gap-3 rounded-2xl bg-card p-4">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex min-h-7 items-center justify-between gap-2">
               <p className="text-[15px] font-semibold">{home.name}</p>
-              <div className="flex -space-x-1.5">
-                {home.people.map((who) => (
-                  <Face key={who} who={who} />
-                ))}
-              </div>
+              {home.owner && <Face who={home.owner} />}
             </div>
             <div className="flex flex-col gap-2">
               {home.spaces.map((space) => (
