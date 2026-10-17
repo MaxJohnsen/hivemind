@@ -3,7 +3,7 @@ import { cn } from 'cn';
 import { ProposedChange } from '@/components/proposed-change';
 import { buttonVariants } from '@/components/ui/button';
 import { Wordmark } from '@/components/wordmark';
-import connected from '@/assets/illustrations/connected.png';
+import dovecote from '@/assets/illustrations/dovecote.webp';
 import resting from '@/assets/illustrations/empty.png';
 import onePlace from '@/assets/illustrations/one-place.webp';
 import rules from '@/assets/illustrations/rules.webp';
@@ -108,8 +108,8 @@ function Drawing({ src, width, height }: { src: string; width: number; height: n
 function Cover() {
   return (
     <section className="mx-auto flex w-full max-w-[44rem] flex-col items-center px-5 pt-6 pb-24 text-center sm:px-8 lg:pb-32">
-      {/* The bird brings what it learned home to the shelf. */}
-      <img src={connected} alt="" width={960} height={640} className="h-auto max-h-[20rem] w-auto max-w-full" />
+      {/* The bird flies home to its loft with one more card, as a homing pigeon would. */}
+      <img src={dovecote} alt="" width={1200} height={805} className="h-auto max-h-[20rem] w-auto max-w-full" />
       <h1 className="t-display mt-8 font-semibold" {...reveal(0)}>A home for everything worth knowing.</h1>
       <p className="t-lead mt-6 max-w-[34rem]" {...reveal(1)}>Your life and work don’t fit into one conversation.</p>
       <p className="t-body mt-4 max-w-[34rem]" {...reveal(2)}>
