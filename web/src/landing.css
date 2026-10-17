@@ -24,9 +24,6 @@
   .landing .link:hover { text-decoration-color: currentColor; }
 }
 
-/* The space an answer came from. */
-.landing .kept { transition: opacity 300ms ease, box-shadow 300ms ease; }
-
 @media (prefers-reduced-motion: no-preference) {
   /* The parts of each chapter rise in turn as it comes into view. */
   .landing.moving [data-reveal] {
@@ -36,11 +33,4 @@
     transition-delay: calc(var(--i, 0) * 80ms);
   }
   .landing.moving [data-reveal].is-in { opacity: 1; transform: none; }
-
-  /* A new answer arrives. */
-  .landing .arrive { animation: arrive 500ms var(--ease-out); }
-  @keyframes arrive {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: none; }
-  }
 }

@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { cn } from 'cn';
 import { ProposedChange } from '@/components/proposed-change';
 import { buttonVariants } from '@/components/ui/button';
 import { Wordmark } from '@/components/wordmark';
 import dovecote from '@/assets/illustrations/dovecote.webp';
+import faceBoy from '@/assets/illustrations/face-boy.webp';
+import faceGirl from '@/assets/illustrations/face-girl.webp';
 import resting from '@/assets/illustrations/empty.png';
 import onePlace from '@/assets/illustrations/one-place.webp';
 import rules from '@/assets/illustrations/rules.webp';
@@ -45,7 +47,7 @@ export function Landing() {
           <p className="t-body" {...reveal(3)}>
             Each project and part of your life gets its own space. Come back weeks later without explaining everything again, switch assistants without losing the context, and let Homing help keep it all up to date.
           </p>
-          <SpacesDemo />
+          <SpacesMap />
         </Chapter>
 
         <Chapter id="sharing" title="Let others build on it, too." drawing={<Drawing src={sharing} width={1200} height={795} />}>
@@ -142,73 +144,68 @@ function Chapter({ id, anchor, band, title, drawing, children }: { id: string; a
   );
 }
 
-// Ana's Homing: three spaces, each with a couple of things her assistants have learned.
-const spaces = [
-  { id: 'acme', name: 'Acme launch', notes: ['Launch is November 14', 'Cara owns the press list'] },
-  { id: 'kitchen', name: 'Kitchen', notes: ['Sage green tiles, 10 × 10 cm', 'Electrician comes November 3'] },
-  { id: 'race', name: 'Half marathon', notes: ['Race day is March 8', 'Long runs on Sundays'] },
+// Two people, each with a home of their own, and Juniper, a studio they both work with.
+type Who = 'Ana' | 'Ben';
+const faces: Record<Who, string> = { Ana: faceGirl, Ben: faceBoy };
+
+/** Someone's face, small, from the same drawings as the rest of Homing. */
+function Face({ who }: { who: Who }) {
+  return <img src={faces[who]} alt={who} title={who} width={128} height={128} className="size-7 rounded-full bg-muted object-cover" />;
+}
+
+const homes: { name: string; people: Who[]; spaces: { name: string; people?: Who[]; closed?: boolean }[] }[] = [
+  { name: 'Ana’s home', people: ['Ana'], spaces: [{ name: 'Kitchen' }, { name: 'Half marathon' }, { name: 'Family trip' }] },
+  {
+    name: 'Juniper',
+    people: ['Ana', 'Ben'],
+    spaces: [
+      { name: 'Website launch', people: ['Ana', 'Ben'] },
+      { name: 'Brand refresh', people: ['Ana', 'Ben'] },
+      { name: 'Budget', people: ['Ana'], closed: true },
+    ],
+  },
+  { name: 'Ben’s home', people: ['Ben'], spaces: [{ name: 'Garden' }, { name: 'Book club' }] },
 ];
 
-const asks = [
-  { assistant: 'Claude', question: 'When is the Acme launch?', answer: 'November 14, and Cara owns the press list.', uses: 'acme' },
-  { assistant: 'ChatGPT', question: 'Which tiles did we pick?', answer: 'The sage green ones, 10 × 10 cm. The electrician comes November 3, so tiling starts after that.', uses: 'kitchen' },
-  { assistant: 'Copilot', question: 'When is my race?', answer: 'March 8. Your long runs are on Sundays.', uses: 'race' },
-];
-
-/** The one thing to try: ask from any assistant, and see the space its answer came from. */
-function SpacesDemo() {
-  const [asked, setAsked] = useState(0);
-  const ask = asks[asked];
+/**
+ * How Homing is built: spaces for each part of life, some holding other spaces. Ben is invited
+ * to Juniper, so he and his assistants reach what's inside it, except the closed budget.
+ */
+function SpacesMap() {
   return (
     <figure className="mt-6 flex flex-col gap-3" {...reveal(4)}>
-      <div data-ui className="flex flex-col gap-5 rounded-2xl border bg-card p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[15px] font-semibold">Ana’s Homing</p>
-          <div role="group" aria-label="Ask from" className="flex rounded-full bg-muted p-1">
-            {asks.map((item, i) => (
-              <button
-                key={item.assistant}
-                type="button"
-                aria-pressed={i === asked}
-                onClick={() => setAsked(i)}
-                className={cn(
-                  'press rounded-full px-3.5 py-1.5 text-sm focus-visible:ring-[3px] focus-visible:ring-ring/70 focus-visible:outline-none',
-                  i === asked ? 'bg-card text-foreground ring-1 ring-input' : 'text-foreground/70 hover:text-foreground',
-                )}
-              >
-                <span className="max-sm:sr-only">Ask </span>
-                {item.assistant}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div key={asked} aria-live="polite" className="arrive flex flex-col gap-3">
-          <p className="max-w-[85%] self-end rounded-2xl bg-muted px-4 py-2.5 text-[15px]">{ask.question}</p>
-          <div className="flex max-w-[90%] flex-col gap-1">
-            <p className="text-sm font-semibold">{ask.assistant}</p>
-            <p className="text-[15px] leading-relaxed">{ask.answer}</p>
-          </div>
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-3">
-          {spaces.map((space) => {
-            const used = space.id === ask.uses;
-            return (
-              <div key={space.id} className={cn('kept flex flex-col gap-1.5 rounded-xl bg-background p-3', used ? 'ring-2 ring-primary' : 'opacity-55')}>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold">{space.name}</p>
-                  {used && <span className="text-xs font-medium text-primary">Used</span>}
-                </div>
-                {space.notes.map((note) => (
-                  <p key={note} className="text-sm leading-snug">{note}</p>
+      <div data-ui className="grid gap-3 sm:grid-cols-3">
+        {homes.map((home) => (
+          <div key={home.name} className="flex flex-col gap-3 rounded-2xl bg-card p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[15px] font-semibold">{home.name}</p>
+              <div className="flex -space-x-1.5">
+                {home.people.map((who) => (
+                  <Face key={who} who={who} />
                 ))}
               </div>
-            );
-          })}
-        </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              {home.spaces.map((space) => (
+                <div key={space.name} className="flex min-h-11 items-center justify-between gap-2 rounded-xl bg-background px-3 py-2">
+                  <p className="text-sm">
+                    {space.name}
+                    {space.closed && <span className="ml-2 text-xs text-muted-foreground">Closed</span>}
+                  </p>
+                  {space.people && (
+                    <div className="flex -space-x-1.5">
+                      {space.people.map((who) => (
+                        <Face key={who} who={who} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
-      <figcaption className="t-small text-muted-foreground">Every assistant answers from the same place.</figcaption>
+      <figcaption className="t-small text-muted-foreground">Invite someone to a space, and they and their assistants reach what’s inside it, except what’s closed.</figcaption>
     </figure>
   );
 }
@@ -236,22 +233,22 @@ function Replied({ assistant, children }: { assistant: string; children: ReactNo
   );
 }
 
-/** Ana shares a decision, and Cara's assistant knows it. */
+/** Ana shares a decision, and Ben's assistant knows it. */
 function ShareSteps() {
   return (
     <>
       <Chat where="Ana, in Claude">
-        <Said>The Acme launch moved to November 14.</Said>
+        <Said>The website launch moved to November 14.</Said>
         <Replied assistant="Claude">
-          <p>Saved for you. Share it with Acme launch? Cara will see it.</p>
+          <p>Saved for you. Share it with Juniper? Ben will see it.</p>
           <div className="mt-3 flex gap-2">
             <span className={smallPrimary}>Share</span>
             <span className={smallOutline}>Keep private</span>
           </div>
         </Replied>
       </Chat>
-      <Chat where="Cara, in ChatGPT">
-        <Said>When do we launch?</Said>
+      <Chat where="Ben, in ChatGPT">
+        <Said>When does the website launch?</Said>
         <Replied assistant="ChatGPT">
           <p>November 14. Ana shared the new date on Monday.</p>
         </Replied>
@@ -264,7 +261,7 @@ function ShareSteps() {
 function RuleCard() {
   return (
     <div data-ui className="mt-6 flex flex-col gap-4 rounded-2xl border bg-card p-4 sm:p-5" {...reveal(3)}>
-      <p className="text-lg font-semibold">Claude suggests a rule for Acme launch</p>
+      <p className="text-lg font-semibold">Claude suggests a rule for Juniper</p>
       <ProposedChange kind="requirement" label="Rule" text="Send status updates on Fridays." />
       <p className="text-sm text-muted-foreground">Only you can approve this.</p>
       <div className="flex gap-2">

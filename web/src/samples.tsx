@@ -8,14 +8,12 @@ import { Confirm } from '@/screens/confirm';
 import { Connect } from '@/screens/connect';
 import { Join } from '@/screens/join';
 import { Landing } from '@/screens/landing';
-import { LandingVisuals } from '@/screens/landing-visuals';
 import { Recover } from '@/screens/recover';
 import { SignIn } from '@/screens/sign-in';
 
 // Every screen with sample data, for `npm run dev:web`. Each state has its own address for review.
 const screens: Record<string, { label: string; render: () => ReactNode }> = {
   '/landing': { label: 'Landing page', render: () => <Landing /> },
-  '/landing/visuals': { label: 'Landing page: five ways to show how Homing is built', render: () => <LandingVisuals /> },
   '/sign-in': { label: 'Sign in', render: () => <SignIn /> },
   '/sign-in/providers': { label: 'Sign in, with Google and Microsoft set up', render: () => <SignIn providers={['google', 'microsoft']} /> },
   '/sign-in/connect': { label: 'Sign in to connect Claude', render: () => <SignIn connecting="Claude" /> },
